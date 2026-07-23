@@ -100,9 +100,13 @@ class Handler(BaseHTTPRequestHandler):
                     top_k = int(qs.get('top_k', ['8'])[0] or 8)
                 except ValueError:
                     top_k = 8
+                try:
+                    threshold = float(qs.get('threshold', ['0'])[0] or 0)
+                except ValueError:
+                    threshold = 0.0
                 if not q:
                     return self._send(400, {"error": "缺少查询参数 q"})
-                return self._send(200, _rs.search(q, f or None, top_k))
+                return self._send(200, _rs.search(q, f or None, top_k, threshold))
             elif path == '/api/cases/reindex':
                 import rag_store as _rs
                 return self._send(200, {"indexed": _rs.build_index()})

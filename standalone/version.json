@@ -1,9 +1,14 @@
 {
   "name": "VIDEO工作流",
-  "version": "2.01",
-  "updated": "2026-07-23 21:03",
+  "version": "2.02",
+  "updated": "2026-07-23 21:20",
   "scheme": "主版本.次版本；小更新依次 2.01、2.02……",
   "history": [
+    {
+      "version": "2.02",
+      "updated": "2026-07-23 21:20",
+      "note": "RAG 语义检索质量提升：案例库语义检索新增「相似度阈值」与「结果数量」可调控件（前端）；后端 rag_store.search 支持 threshold 参数并按阈值过滤低相关案例；/api/cases/search 透传 threshold。基于 2.0 基线。"
+    },
     {
       "version": "2.01",
       "updated": "2026-07-23 21:03",

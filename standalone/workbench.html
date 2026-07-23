@@ -475,7 +475,7 @@
   <span class="ctx" id="ctx"></span>
   <a class="head-link" href="workflow.html" target="_blank">🗺️ 工作流地图</a>
 </header>
-<div class="verbar">🏷️ 商业视频全案策划引擎 <b>2.01</b> ｜ 更新时间：2026-07-23 21:03</div>
+<div class="verbar">🏷️ 商业视频全案策划引擎 <b>2.02</b> ｜ 更新时间：2026-07-23 21:20</div>
 <div class="layout">
   <nav id="nav"></nav>
   <main id="main"></main>
@@ -1620,6 +1620,10 @@ async function loadProject() {
     const TYPES = ["全部","广告片","企业宣传片","微电影","产品宣传片","短视频","口播","AI漫剧"];
     const INDUSTRIES = ["全部","科技数码","汽车","食品饮料","服装时尚","互联网","体育用品","日化美妆","餐饮","家居","家电","教育","游戏娱乐","珠宝","航空旅游","金融保险","零售","公益"];
     const YEARS = ["全部","2026","2025","2024","2023","2022"];
+    const THRS = [["不限",0],["≥0.3",0.3],["≥0.4",0.4],["≥0.5",0.5],["≥0.6",0.6]];
+    const KS = [8,12,16,20];
+    if (state._semThreshold === undefined) state._semThreshold = 0;
+    if (state._semTopk === undefined) state._semTopk = 12;
 
     const setFilter = (k, v) => { if (!state._caseFilter) state._caseFilter = {}; state._caseFilter[k] = v; save(); rerender(); };
     const sel = (k) => `onchange="App._setCaseFilter('${k}',this.value)"`;
@@ -1654,7 +1658,11 @@ async function loadProject() {
       <select ${sel("industry")}>${INDUSTRIES.map(t => `<option ${filter.industry===t?"selected":""}>${t}</option>`).join("")}</select>
       <span class="fsep">时间</span>
       <select ${sel("year")}>${YEARS.map(t => `<option ${filter.year===t?"selected":""}>${t}</option>`).join("")}</select>
-      <button class="primary" onclick="App._semSearch()">语义检索</button>
+            <span class="fsep">阈值</span>
+      <select id="semThr">${THRS.map(t => `<option value="${t[1]}" ${state._semThreshold===t[1]?"selected":""}>${t[0]}</option>`).join("")}</select>
+      <span class="fsep">数量</span>
+      <select id="semK">${KS.map(k => `<option ${state._semTopk===k?"selected":""}>${k}</option>`).join("")}</select>
+<button class="primary" onclick="App._semSearch()">语义检索</button>
     </div>
     <div id="semResults">${resHtml}</div>`;
     }
@@ -1694,7 +1702,13 @@ async function loadProject() {
     if (f.type && f.type !== "全部") params.set("type", f.type);
     if (f.industry && f.industry !== "全部") params.set("industry", f.industry);
     if (f.year && f.year !== "全部") params.set("year", f.year);
-    params.set("top_k", "12");
+    const thrEl = document.getElementById("semThr");
+    const kEl = document.getElementById("semK");
+    const thr = thrEl ? (parseFloat(thrEl.value) || 0) : 0;
+    const k = kEl ? (parseInt(kEl.value) || 12) : 12;
+    state._semThreshold = thr; state._semTopk = k; save();
+    if (thr > 0) params.set("threshold", String(thr));
+    params.set("top_k", String(k));
     const box = document.getElementById("semResults");
     if (box) box.innerHTML = `<div class="cap">🧠 向量检索中（首次加载模型可能稍慢，请稍候）…</div>`;
     fetch("/api/cases/search?" + params.toString()).then(r => r.json()).then(res => {
@@ -1758,7 +1772,7 @@ async function loadProject() {
 
 
 </script>
-<footer class="app-footer">🏷️ 商业视频全案策划引擎 <b>2.01</b> ｜ 更新时间：2026-07-23 21:03<br>网页工作台入口（外网）：<a id="entryLink" href="">本工作台外网入口（自动识别）</a></footer>
+<footer class="app-footer">🏷️ 商业视频全案策划引擎 <b>2.02</b> ｜ 更新时间：2026-07-23 21:20<br>网页工作台入口（外网）：<a id="entryLink" href="">本工作台外网入口（自动识别）</a></footer>
 <script>try{var _u=location.href.split("#")[0];var _a=document.getElementById("entryLink");if(_a){_a.href=_u;_a.textContent=_u;}}catch(e){}</script>
 </body>
 </html>

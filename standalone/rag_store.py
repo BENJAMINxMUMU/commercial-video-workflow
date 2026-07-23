@@ -63,7 +63,7 @@ def _load():
     return _cache
 
 
-def search(query, filters=None, top_k=8):
+def search(query, filters=None, top_k=8, threshold=0.0):
     ids, mat = _load()
     cases = {c["id"]: c for c in json.load(open(DATA, encoding="utf-8"))}
     qv = np.array(list(_get_model().embed([query]))[0], dtype="float32")
@@ -77,9 +77,12 @@ def search(query, filters=None, top_k=8):
         c = cases.get(cid)
         if not c:
             continue
+        score = float(sims[i])
+        if threshold > 0 and score < threshold:
+            break
         if filters and not _pass(c, filters):
             continue
-        res.append({"id": cid, "score": round(float(sims[i]), 4), "case": c})
+        res.append({"id": cid, "score": round(score, 4), "case": c})
         if len(res) >= top_k:
             break
     return res
