@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商业视频全流程策划 · 工作流地图</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171d26; --panel2:#1d2530; --line:#2a3340;
+    --ink:#e8ecf1; --sub:#9aa6b2; --accent:#4f8cff; --accent2:#ffb454;
+    --good:#3ecf8e; --warn:#ff7a7a; --chip:#222c39;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 22px 80px}
+
+  /* 顶部栏 */
+  header{position:sticky;top:0;z-index:20;background:rgba(15,20,25,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;padding:14px 22px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;letter-spacing:.4px}
+  header .tag{font-size:12px;color:var(--sub);border:1px solid var(--line);
+    padding:2px 9px;border-radius:20px}
+  .spacer{flex:1}
+  .btn{font-size:13px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--accent);color:#fff}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .verbar{background:var(--panel2);color:var(--sub);font-size:12px;padding:7px 22px;border-bottom:1px solid var(--line)}
+  .verbar b{color:var(--accent)}
+
+  h2.sec{font-size:20px;margin:46px 0 6px;display:flex;align-items:center;gap:10px}
+  h2.sec .n{font-size:13px;color:var(--bg);background:var(--accent2);
+    width:24px;height:24px;border-radius:7px;display:inline-flex;
+    align-items:center;justify-content:center;font-weight:700}
+  .sec-cap{color:var(--sub);font-size:13.5px;margin:0 0 18px}
+
+  /* 全局上下文条 */
+  .ctx-bar{background:linear-gradient(90deg,#1b2433,#171d26);border:1px solid var(--line);
+    border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .ctx-bar .ic{font-size:26px}
+  .ctx-bar b{color:#fff}
+  .ctx-bar .meta{color:var(--sub);font-size:13px}
+
+  /* 流程图区 */
+  .flow-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px;overflow-x:auto}
+  .flow-scroll{min-width:1180px}
+  svg{display:block;width:100%;height:auto;font-family:inherit}
+  .node{cursor:pointer}
+  .node rect{transition:.15s}
+  .node:hover rect{stroke:var(--accent);stroke-width:2.4}
+  .node .t{fill:var(--ink);font-size:14px;font-weight:600}
+  .node .s{fill:var(--sub);font-size:11px}
+  .node .no{fill:var(--accent);font-size:12px;font-weight:700}
+  .edge{fill:none;stroke:#3a4654;stroke-width:1.8}
+  .edge.hl{stroke:var(--accent);stroke-width:2.6}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;color:var(--sub);font-size:12.5px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+  /* 环节详情卡片 */
+  .stage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .scard{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;scroll-margin-top:80px;transition:.2s}
+  .scard.flash{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.25)}
+  .scard .hd{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .scard .hd .no{background:var(--chip);color:var(--accent);font-weight:700;
+    width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+  .scard .hd h3{margin:0;font-size:16px}
+  .scard .hd .ic{font-size:18px}
+  .scard .sub{color:var(--sub);font-size:13px;margin:0 0 12px}
+  .kv{font-size:13px;margin:8px 0}
+  .kv .k{color:var(--sub);display:block;margin-bottom:5px;font-size:12px;letter-spacing:.3px}
+  .badge{display:inline-block;background:var(--chip);border:1px solid var(--line);
+    color:var(--ink);font-size:12px;padding:3px 9px;border-radius:7px;margin:0 6px 6px 0}
+  .badge.term{background:#243042;border-color:#34507a;color:#bcd4ff}
+  .out li{margin:3px 0;color:#d7dee6;font-size:13px}
+  .tips{background:var(--panel2);border-left:3px solid var(--accent2);
+    padding:9px 12px;border-radius:0 8px 8px 0;font-size:12.5px;color:#cfd8e2;margin-top:10px}
+
+  /* 视频类型 */
+  .vt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .vt{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .vt h4{margin:0 0 4px;font-size:15px;color:#fff}
+  .vt p{margin:0 0 10px;color:var(--sub);font-size:12.5px}
+  .vt ul{margin:0;padding-left:16px;color:#cfd8e2;font-size:12.5px}
+  .vt li{margin:3px 0}
+
+  /* 铁律 */
+  .rules{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .rule{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:15px 17px;display:flex;gap:12px;align-items:flex-start}
+  .rule .rn{background:var(--good);color:#06281c;font-weight:800;font-size:13px;
+    width:24px;height:24px;border-radius:50%;flex:0 0 24px;display:flex;align-items:center;justify-content:center}
+  .rule p{margin:0;font-size:13.5px;color:#dde4ec}
+
+  /* 执行顺序时间线 */
+  .timeline{position:relative;padding-left:26px}
+  .timeline:before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .tl-item{position:relative;margin:0 0 14px;font-size:14px;color:#dbe2ea}
+  .tl-item:before{content:"";position:absolute;left:-22px;top:6px;width:11px;height:11px;
+    border-radius:50%;background:var(--accent2);border:2px solid var(--bg)}
+  .tl-item b{color:#fff}
+
+  /* 自检清单 */
+  .check{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+  .chk{display:flex;gap:11px;align-items:flex-start;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:13px 15px;font-size:13.5px;color:#dbe2ea}
+  .chk .box{flex:0 0 18px;width:18px;height:18px;border:1.6px solid var(--sub);border-radius:5px;margin-top:2px}
+
+  footer{text-align:center;color:var(--sub);font-size:12px;margin-top:60px;border-top:1px solid var(--line);padding-top:22px}
+
+  @media(max-width:640px){
+    .stage-grid,.vt-grid,.rules,.check{grid-template-columns:1fr}
+  }
+  @media print{
+    body{background:#fff;color:#111}
+    header{position:static;background:#fff;border-bottom:2px solid #111}
+    .btn,.spacer{display:none}
+    .flow-card,.scard,.vt,.rule,.chk,.ctx-bar{break-inside:avoid}
+    .panel,.scard,.vt,.rule,.chk{background:#fff;border:1px solid #ccc}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗺️ 商业视频全流程策划 · 工作流地图</h1>
+  <span class="tag">8 大环节 · 可视化全流程</span>
+  <span class="spacer"></span>
+  <a class="btn" href="workflow.html" onclick="window.print();return false;">🖨️ 打印 / 导出 PDF</a>
+  <a class="btn primary" href="workbench.html" target="_blank">➡️ 进入填写工作台</a>
+</header>
+<div class="verbar">🏷️ 商业视频全案策划引擎 <b>beta2.09</b> ｜ 更新时间：2026-07-22 00:16</div>
+
+<div class="wrap">
+
+  <!-- 全局上下文 -->
+  <div class="ctx-bar">
+    <span class="ic">⚙️</span>
+    <div>
+      <b>项目设置（全局上下文）</b><br>
+      <span class="meta">影片类型 · 时长 · 画幅 · 投放渠道 · 目标受众 —— 贯穿后续所有环节，须最先明确并全程复用。</span>
+    </div>
+  </div>
+
+  <!-- 1. 流程图 -->
+  <h2 class="sec"><span class="n">1</span> 全流程可视化地图</h2>
+  <p class="sec-cap">8 大标准环节以节点连线呈现：箭头表示「输入来自」，实线主链为线性推进，虚线分支为并行环节。</p>
+  <div class="flow-card">
+    <div class="flow-scroll">
+      <svg id="flow" viewBox="0 0 1180 600" preserveAspectRatio="xMinYMin meet"></svg>
+    </div>
+    <div class="legend">
+      <span><i style="background:#4f8cff"></i>主链环节（顺序推进）</span>
+      <span><i style="background:#ffb454"></i>并行分支（脚本确定后启动）</span>
+      <span><i style="background:#3ecf8e"></i>终态交付（PPT 整合）</span>
+      <span>↳ 点击任意节点查看环节详情</span>
+    </div>
+  </div>
+
+  <!-- 2. 环节详情 -->
+  <h2 class="sec"><span class="n">2</span> 八大环节详解</h2>
+  <p class="sec-cap">每个环节的「输入来源 → 本环节动作 → 标准产出物」，点击上方节点可快速定位。</p>
+  <div class="stage-grid" id="stageGrid"></div>
+
+  <!-- 3. 视频类型 -->
+  <h2 class="sec"><span class="n">3</span> 五类商业视频差异</h2>
+  <p class="sec-cap">同一套工作流适用于全部类型，差异主要体现在节奏、画幅与差异化参数上。</p>
+  <div class="vt-grid" id="vtGrid"></div>
+
+  <!-- 4. 五条铁律 -->
+  <h2 class="sec"><span class="n">4</span> 五条专业铁律</h2>
+  <p class="sec-cap">贯穿全流程的底线原则，任何环节都不容违背。</p>
+  <div class="rules" id="rules"></div>
+
+  <!-- 5. 执行顺序 -->
+  <h2 class="sec"><span class="n">5</span> 推荐执行顺序</h2>
+  <p class="sec-cap">降低返工、控制成本的关键路径。</p>
+  <div class="timeline" id="timeline"></div>
+
+  <!-- 6. 自检清单 -->
+  <h2 class="sec"><span class="n">6</span> 提报前质量自检</h2>
+  <p class="sec-cap">交付 PPT 前逐条核对，全部通过方可提报。</p>
+  <div class="check" id="check"></div>
+
+  <footer>🏷️ 商业视频全案策划引擎 <b>beta2.09</b> ｜ 更新时间：2026-07-22 00:16<br>商业视频全案策划引擎 · 可视化地图<br>网页工作台入口（外网）：<a href="https://drives-northern-thermal-rides.trycloudflare.com/workbench.html">https://drives-northern-thermal-rides.trycloudflare.com/workbench.html</a></footer>
+</div>
+
+<script>
+/* ---------- 数据（与工作台 config.py 保持一致） ---------- */
+const STAGES_VIS = [
+  {id:'stage1',no:1,icon:'📋',title:'需求提炼',sub:'结构化《需求简报 BRD》',col:0,row:2,upstream:[],
+   outputs:['《需求简报 BRD》','品牌/产品/目标/受众/预算/排期','核心诉求与成功指标'],
+   tips:'用结构化模板把客户口头需求翻译成可执行的简报；明确「为什么做」「给谁看」「要达到什么效果」。'},
+  {id:'stage2',no:2,icon:'💡',title:'创意策划',sub:'3 套差异化创意方向',col:1,row:2,upstream:['stage1'],
+   outputs:['3 套创意方向（概念 / 调性 / 核心意象）','一句话 Logline','方向对比与推荐理由'],
+   tips:'基于需求提炼 3 条差异化路线；每条用一句话创意锚定，并标注适配的人群与渠道。'},
+  {id:'stage3',no:3,icon:'📝',title:'创意脚本',sub:'文学脚本 + 参考视频',col:2,row:2,upstream:['stage1','stage2'],
+   outputs:['文学脚本（场次 / 台词 / 情绪曲线）','参考视频清单','叙事结构与节奏骨架'],
+   tips:'把选定方向写成可拍的文学脚本；先搜集参考视频再原创，可显著降低偏差率。'},
+  {id:'stage4',no:4,icon:'🎬',title:'文字分镜',sub:'八列分镜表（执行蓝图）',col:3,row:1,upstream:['stage3'],
+   outputs:['八列分镜表（镜号/景别/运镜/画面/台词/音效/时长/备注）','镜头数量与时长校验'],
+   tips:'把脚本拆成可执行的镜头蓝图；分镜时长加总须等于总时长，不可漏算转场。'},
+  {id:'stage5',no:5,icon:'🖼️',title:'分镜图',sub:'故事板绘制 + 一致性',col:4,row:1,upstream:['stage4'],
+   outputs:['手绘 / AI 故事板','画面一致性规范','关键帧视觉参考'],
+   tips:'把分镜画成图，统一人物、场景、光影风格，作为拍摄与后期的视觉基准。'},
+  {id:'stage6',no:6,icon:'🎞️',title:'动态分镜',sub:'Animatic 节奏校验',col:5,row:1,upstream:['stage4','stage5'],
+   outputs:['Animatic 动态分镜视频','节奏 / 时长问题清单','修改确认签字'],
+   tips:'用分镜图 + 音轨粗剪出 Animatic，是成本最低的节奏校验工具，正式拍摄前必过。'},
+  {id:'stage7',no:7,icon:'🎨',title:'提报资料',sub:'影调/美术/选角/服化道',col:4,row:3,upstream:['stage3'],branch:true,
+   outputs:['影调 / 风格参考','美术与置景方案','演员 / 服装 / 道具清单'],
+   tips:'脚本确定后并行启动：视觉参考、美术置景、选角与服化道，统一交付给 PPT 整合。'},
+  {id:'stage8',no:8,icon:'📊',title:'PPT 整合',sub:'15 页可提报方案',col:6,row:2,upstream:['stage1','stage2','stage3','stage4','stage5','stage6','stage7'],term:true,
+   outputs:['15 页《可提报创意方案》PPTX','逻辑链：为什么 → 做什么 → 做成什么样'],
+   tips:'把前 7 环节产出按「说服客户」的逻辑编排成销售工具，而非作品集展示。'},
+];
+
+const VIDEO_TYPES = {
+  '广告片':{desc:'15s / 30s / 60s，信息密度高，每个镜头都有信息增量。',extra:[
+    ['黄金 3 秒钩子设计','单独要求开场设计，前 3 秒必须抓住注意力。'],
+    ['产品露出策略','明确产品在第几秒出现、以什么方式出现。']]},
+  '企业宣传片':{desc:'2-5 分钟，张弛有度，有大气段落也有细节段落。',extra:[
+    ['企业核心信息层级','按优先级排列必传信息。'],
+    ['叙事视角','第三人称旁白 / 第一人称自述 / 人物视角。']]},
+  '微电影':{desc:'3-10 分钟，起承转合完整故事，品牌作为背景或转折点。',extra:[
+    ['人物小传','主角背景、欲望、障碍、转变弧光。'],
+    ['三幕结构','建置-对抗-结局，明确转折点位置。']]},
+  '产品宣传片':{desc:'60s-3 分钟，卖点段落清晰，每个功能一个「小高潮」。',extra:[
+    ['核心卖点排序','按用户决策权重排列。'],
+    ['功能可视化方式','每个功能用什么画面呈现。']]},
+  '短视频':{desc:'15-60 秒，竖屏 9:16，字幕化，静音也能看懂。',extra:[
+    ['前三秒钩子类型','提问式 / 反差式 / 结果前置式 / 痛点直击式。'],
+    ['字幕设计','关键信息字幕化，用户静音也能看懂。'],
+    ['行动指令 CTA','结尾明确引导什么动作。']]},
+  '口播':{desc:'1-3 分钟，真人 / 虚拟人口播直述，强人设、强节奏、强转化。',extra:[
+    ['人设与口播风格','主播人设、语气、与观众的关系定位。'],
+    ['信息密度与节奏','每 15 秒一个信息点，避免冷场与啰嗦。']]},
+  'AI漫剧':{desc:'1-2 分钟 / 集，竖屏连载，AI 生成为主，强悬念、强反转、强追更。',extra:[
+    ['爆款选题与爽点结构','逆袭 / 反转 / 打脸等爽点节奏设计。'],
+    ['AI 生成一致性','角色 / 场景 / 画风跨集一致性方案。'],
+    ['分集钩子与追更','每集结尾悬念与付费 / 追更引导。']]},
+};
+
+const IRON_RULES = [
+  '一句话创意锚定法：每个方案先提炼一句话核心创意点（Logline），所有环节围绕它展开。',
+  '受众-渠道双约束：创意启动前必须明确目标受众画像 + 投放渠道，决定节奏、画幅、信息密度。',
+  '参考先行原则：脚本 / 分镜 / 美术全部先找参考再原创，凭空创作偏差率是有参考的 3 倍以上。',
+  '节奏前置验证：动态分镜（Animatic）是成本最低的节奏校验工具，正式拍摄前必须过这一关。',
+  '提报 PPT = 销售工具：不是作品展示，是说服客户买单的逻辑链——从「为什么」到「做成什么样」再到「我们能做好」。',
+];
+
+const WORKFLOW_ORDER = [
+  '<b>环节 1 需求提炼</b>：跟客户确认后再往下走，避免返工。',
+  '<b>环节 2 创意策划</b>：出三方向，客户选定方向后再进入脚本细化。',
+  '<b>环节 3→4→5→6</b>：线性推进，每一步的输出是下一步的输入。',
+  '<b>环节 7 提报资料</b>：并行——脚本确定后，美术 / 选角 / 置景可同步启动。',
+  '<b>环节 8 PPT 整合</b>：最后整合，把前面所有产出按 PPT 结构编排。',
+];
+
+const SELFCHECK = [
+  '一句话创意是否清晰有力？看完方案能不能复述出来？',
+  '所有创意决策是否都能回溯到「对受众 / 目标有用」？',
+  '分镜时长加总是否等于总时长？有没有漏算转场？',
+  '视觉参考是否统一？有没有东拼西凑的感觉？',
+  'PPT 逻辑链是否通顺？从「为什么」到「怎么做」能不能一气呵成？',
+  '预算和排期是否合理？有没有明显实现不了的创意？',
+];
+
+/* ---------- 绘制流程图 SVG ---------- */
+const NS='http://www.w3.org/2000/svg';
+const COL_W=170, ROW_H=130, NW=150, NH=66, PAD=20;
+const X = c => PAD + c*COL_W + NW/2;
+const Y = r => PAD + r*ROW_H + NH/2;
+const byId = {};
+STAGES_VIS.forEach(s=>byId[s.id]=s);
+
+function el(tag,attrs){const e=document.createElementNS(NS,tag);
+  for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+const svg=document.getElementById('flow');
+// 箭头标记
+const defs=el('defs',{});
+defs.innerHTML=`<marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3"
+  orient="auto" markerUnits="userSpaceOnUse">
+  <path d="M0,0 L7,3 L0,6 Z" fill="#3a4654"/></marker>
+  <marker id="arrowA" markerWidth="9" markerHeight="9" refX="7" refY="3"
+  orient="auto" markerUnits="userSpaceOnUse">
+  <path d="M0,0 L7,3 L0,6 Z" fill="#4f8cff"/></marker>`;
+svg.appendChild(defs);
+
+// 先画边
+STAGES_VIS.forEach(s=>{
+  s.upstream.forEach(up=>{
+    const a=byId[up], b=s;
+    const x1=X(a.col)+NW/2, y1=Y(a.row);
+    const x2=X(b.col)-NW/2, y2=Y(b.row);
+    const mx=(x1+x2)/2;
+    const d=`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    const path=el('path',{d,class:'edge'+(s.branch?' hl':'')});
+    if(s.branch)path.setAttribute('stroke-dasharray','5 4');
+    if(s.branch)path.setAttribute('marker-end','url(#arrowA)');
+    else path.setAttribute('marker-end','url(#arrow)');
+    svg.appendChild(path);
+  });
+});
+
+// 再画节点
+STAGES_VIS.forEach(s=>{
+  const g=el('g',{class:'node','data-id':s.id});
+  let fill='#1d2530', stroke='#3a4654';
+  if(s.term){fill='#10321f';stroke='#3ecf8e';}
+  else if(s.branch){fill='#2a2415';stroke='#ffb454';}
+  else {fill='#16243a';stroke='#4f8cff';}
+  g.appendChild(el('rect',{x:X(s.col)-NW/2,y:Y(s.row)-NH/2,width:NW,height:NH,rx:11,
+    fill,stroke,'stroke-width':1.8}));
+  const t=el('text',{x:X(s.col),y:Y(s.row)-6,'text-anchor':'middle',class:'t'});
+  t.textContent=`${s.icon} ${s.title}`; g.appendChild(t);
+  const sub=el('text',{x:X(s.col),y:Y(s.row)+13,'text-anchor':'middle',class:'s'});
+  sub.textContent=s.sub; g.appendChild(sub);
+  const no=el('text',{x:X(s.col)-NW/2+12,y:Y(s.row)-NH/2+18,class:'no'});
+  no.textContent='0'+s.no; g.appendChild(no);
+  g.addEventListener('click',()=>focusStage(s.id));
+  svg.appendChild(g);
+});
+
+/* ---------- 环节详情卡片 ---------- */
+const grid=document.getElementById('stageGrid');
+STAGES_VIS.forEach(s=>{
+  const ups = s.upstream.length
+    ? s.upstream.map(u=>`<span class="badge term">← ${byId[u].title}</span>`).join('')
+    : '<span class="badge">全局上下文（项目设置）</span>';
+  const outs = s.outputs.map(o=>`<li>${o}</li>`).join('');
+  const div=document.createElement('div');
+  div.className='scard'; div.id='card-'+s.id;
+  div.innerHTML=`
+    <div class="hd"><span class="no">${s.no}</span><span class="ic">${s.icon}</span>
+      <h3>${s.title}</h3></div>
+    <p class="sub">${s.sub}</p>
+    <div class="kv"><span class="k">输入来源</span>${ups}</div>
+    <div class="kv"><span class="k">标准产出物</span><ul class="out">${outs}</ul></div>
+    <div class="tips">💡 ${s.tips}</div>`;
+  grid.appendChild(div);
+});
+
+function focusStage(id){
+  const c=document.getElementById('card-'+id);
+  if(!c)return;
+  c.scrollIntoView({behavior:'smooth',block:'center'});
+  c.classList.add('flash');
+  setTimeout(()=>c.classList.remove('flash'),1600);
+}
+
+/* ---------- 视频类型 ---------- */
+const vtGrid=document.getElementById('vtGrid');
+Object.keys(VIDEO_TYPES).forEach(name=>{
+  const v=VIDEO_TYPES[name];
+  const li=v.extra.map(e=>`<li><b>${e[0]}</b>：${e[1]}</li>`).join('');
+  const d=document.createElement('div');d.className='vt';
+  d.innerHTML=`<h4>${name}</h4><p>${v.desc}</p><ul>${li}</ul>`;
+  vtGrid.appendChild(d);
+});
+
+/* ---------- 铁律 ---------- */
+const rulesBox=document.getElementById('rules');
+IRON_RULES.forEach((r,i)=>{
+  const d=document.createElement('div');d.className='rule';
+  d.innerHTML=`<span class="rn">${i+1}</span><p>${r}</p>`;
+  rulesBox.appendChild(d);
+});
+
+/* ---------- 执行顺序 ---------- */
+const tl=document.getElementById('timeline');
+WORKFLOW_ORDER.forEach(t=>{
+  const d=document.createElement('div');d.className='tl-item';d.innerHTML=t;
+  tl.appendChild(d);
+});
+
+/* ---------- 自检清单 ---------- */
+const chk=document.getElementById('check');
+SELFCHECK.forEach(t=>{
+  const d=document.createElement('div');d.className='chk';
+  d.innerHTML=`<span class="box"></span><span>${t}</span>`;
+  chk.appendChild(d);
+});
+</script>
+</body>
+</html>

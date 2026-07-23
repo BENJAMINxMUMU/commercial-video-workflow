@@ -1,0 +1,17 @@
+# ===== Python 字节码 / 缓存 =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== 运行时生成（可由代码/接口重建，无需入库）=====
+standalone/data/vectors.npz
+standalone/CURRENT_URL.txt
+
+# ===== 运行时输出目录（保留空目录占位）=====
+output/*
+!output/.gitkeep
+standalone/data/projects/*
+!standalone/data/projects/.gitkeep
+
+# 演示/截图产物（本地生成，不入库）
+standalone/workbench_entry.png

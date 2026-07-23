@@ -1,0 +1,2 @@
+streamlit>=1.59
+python-pptx>=1.0
