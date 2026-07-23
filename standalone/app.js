@@ -103,6 +103,9 @@
 
   // ===================== 状态 =====================
   const LS_KEY = "cv_workflow_state_v1";
+  const LS_PROJECTS = "cv_workflow_projects_v1";   // 本机多项目库
+  const LS_AUTOSAVE = "cv_workflow_autosave_v1";    // 自动存档快照
+  const APP_VERSION = "2.03";
   function defaultState() {
     return {
       meta: { project_name: "", client: "", video_type: "广告片", duration: "30秒",
@@ -122,7 +125,7 @@
     try { const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s && s.meta) { const m = Object.assign(defaultState(), s); m._cases = []; return m; } } catch (e) {}
     return defaultState();
   }
-  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ ts: Date.now(), data: state })); } catch (e) {} }
 
   // 路径读写
   function get(path, def) { let c = state; for (const k of path.split(".")) { if (c == null) return def; c = c[k]; } return c === undefined ? def : c; }
@@ -334,11 +337,56 @@ ${sum}
     return `<div class="fi"><label class="lbl">${label}</label><input type="text" value="${esc(v)}" placeholder="${ph || ""}" oninput="App.onInput('${path}',this)"></div>`;
   }
 
+  // ===================== 完成度 / 自动存档 =====================
+  function completeness() {
+    const s = state;
+    const stages = [
+      { id: "project", title: "项目设置", ok: !!(s.meta.project_name && s.meta.project_name.trim()), miss: "项目名称" },
+      { id: "stage1", title: "需求提炼", ok: !!(s.stage1.raw_need && s.stage1.raw_need.trim()) || Object.values(s.stage1.brd || {}).some(v => v && String(v).trim()), miss: "原始需求 / BRD" },
+      { id: "stage2", title: "创意策划", ok: (s.stage2.directions || []).some(d => d && d.name), miss: "至少 1 套创意方向" },
+      { id: "stage3", title: "创意脚本", ok: (s.stage3.segments || []).some(d => d && (d.visual || d.voiceover)), miss: "脚本段落" },
+      { id: "stage4", title: "文字分镜", ok: (s.stage4.shots || []).length > 0, miss: "分镜表" },
+      { id: "stage5", title: "分镜图", ok: (s.stage5.boards || []).some(b => b && (b.image_data || b.gen_prompt)) || Object.values(s.stage5.style_lock || {}).some(v => v && String(v).trim()), miss: "一致性锁定 / 分镜图" },
+      { id: "stage6", title: "动态分镜", ok: ["timeline", "kb_effects", "transitions", "sound_design", "beat_points", "checklist"].some(k => s.stage6[k] && String(s.stage6[k]).trim()), miss: "动态分镜规范" },
+      { id: "stage7", title: "提报资料", ok: (s.stage7.actors || []).length > 0 || (s.stage7.art_set || []).length > 0 || (s.stage7.props || []).length > 0 || (s.stage7.mood && s.stage7.mood.trim()) || (s.stage7.moodboard && s.stage7.moodboard.color_palette && s.stage7.moodboard.color_palette.trim()), miss: "影调/角色/场景/道具" },
+      { id: "stage8", title: "PPT 整合", ok: !!(s.stage8._checked_pages && Object.values(s.stage8._checked_pages).some(Boolean)) || (s.stage8.ppt_title && s.stage8.ppt_title.trim()), miss: "PPT 页面确认 / 标题" },
+    ];
+    const done = stages.filter(x => x.ok).length;
+    return { stages, done, total: stages.length, pct: Math.round(done / stages.length * 100), missing: stages.filter(x => !x.ok).map(x => x.title) };
+  }
+  function _autosaveInfo() {
+    try { const a = JSON.parse(localStorage.getItem(LS_AUTOSAVE)); if (a && a.ts) return { ts: a.ts, label: new Date(a.ts).toLocaleString("zh-CN"), data: a.data }; } catch (e) {}
+    return null;
+  }
+  function _restoreAutosave() {
+    const as = _autosaveInfo();
+    if (!as) { setMsg("没有可恢复的自动存档"); return; }
+    if (!confirm("用自动存档覆盖当前内容？未保存的改动会丢失。")) return;
+    state = JSON.parse(JSON.stringify(as.data)); save(); current = "project"; rerender();
+    setMsg("🕘 已恢复自动存档（" + as.label + "）");
+  }
+
   // ===================== 各阶段渲染 =====================
   function renderProject() {
     const m = state.meta;
+    const comp = completeness();
+    const dash = `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:18px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-weight:700;font-size:15px">📊 方案完成度</span>
+    <span style="font-weight:800;font-size:20px;color:${m.accent_color}">${comp.pct}%</span>
+  </div>
+  <div style="height:8px;background:#eef0f3;border-radius:6px;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:${comp.pct}%;background:${m.accent_color};border-radius:6px"></div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+    ${comp.stages.map(x => `<span onclick="App.go('${x.id}')" style="cursor:pointer;font-size:12px;padding:3px 9px;border-radius:20px;border:1px solid ${x.ok ? '#c8e6c9' : '#ffe0b2'};background:${x.ok ? '#f1f8f2' : '#fff8ef'};color:${x.ok ? '#2e7d32' : '#b26a00'}">${x.ok ? '✅' : '⚠️'} ${x.title}</span>`).join('')}
+  </div>
+  ${comp.missing.length ? `<div style="font-size:12px;color:#b42318">待完成：${comp.missing.join('、')}</div>` : `<div style="font-size:12px;color:#2e7d32">🎉 全部环节已填写，可导出全案 / 生成 PPTX</div>`}
+</div>`;
+    const as = _autosaveInfo();
+    const asDirty = as && JSON.stringify(as.data) !== JSON.stringify(state);
+    const asHtml = as ? `<div style="font-size:12px;color:#667085;margin-top:10px">🕘 上次自动保存：${as.label}${asDirty ? ` ｜ <button class="mini" onclick="App._restoreAutosave()">↩ 恢复自动存档</button>` : ` ｜ 与当前内容一致`}</div>` : "";
     let ex = VIDEO_TYPES[m.video_type].extra.map(e => `<li><code>${e[0]}</code>：${e[1]}</li>`).join("");
     return `
+    ${dash}
     <h2>⚙️ 项目设置</h2><p class="cap">全局上下文贯穿后续所有环节，请先填好。</p>
     <div class="grid2">
       ${field("meta.project_name", "项目名称", "如：星河科技 2025 品牌宣传片")}
@@ -361,7 +409,7 @@ ${sum}
       <button onclick="App.newProject()">🆕 新建项目</button>
       <button class="primary" onclick="App.exportPlan()">📤 导出全案</button>
       <button onclick="App.copyAllPrompts()">📋 复制全案提示词</button>
-    </div>`;
+    </div>${asHtml}`;
   }
   function renderStage1() {
     const p = promptStage1();
@@ -409,6 +457,7 @@ ${sum}
   }
   function renderStage3() {
     const p = promptStage3();
+    const d3 = chosenDir();
     const segs = state.stage3.segments;
     if (!segs.length) segs.push({});
     let rows = segs.map((s, i) => `
@@ -423,6 +472,11 @@ ${sum}
         ${field("stage3.segments." + i + ".reference", "参考片（片名+链接+参考维度）", "", "area")}
       </div>`).join("");
     return `<h2>📝 环节3 · 创意脚本</h2><p class="cap">文学脚本 + 参考视频清单，按段落控制时长。</p>
+    ${d3.name || d3.logline ? `<div style="background:#f5f8ff;border:1px solid #d6e4ff;border-radius:10px;padding:10px 12px;margin:4px 0 14px">
+      🎯 当前选用创意方向：<b>${esc(d3.name || "未命名")}</b>${d3.logline ? ` ｜ 一句话创意：<b>${esc(d3.logline)}</b>` : ""}
+      ${d3.narrative ? `<div style="margin-top:4px;font-size:12px;color:#5f6368">叙事结构：${esc(d3.narrative)}</div>` : ""}
+      <div style="margin-top:8px"><button class="mini" onclick="App.seedScriptFromDirection()">⚡ 用该方向初始化脚本结构</button></div>
+    </div>` : `<div class="cap" style="margin:4px 0 14px">💡 提示：先在「环节2 · 创意策划」选定一套方向，这里可一键把创意带入脚本。</div>`}
     ${proPoints(["创意脚本=文学脚本，侧重“讲什么故事”，不分镜头。", "包含：场景+人物动作+台词/旁白+音效/音乐。", "必须配套参考视频清单：每段对应1-2条参考片。"])}
     ${promptBlock("🤖 本环节 AI 提示词", p)}
     <div class="refresh"><button onclick="App.rerender()">🔄 刷新提示词</button></div>
@@ -433,9 +487,26 @@ ${sum}
       ${field("stage3.music_style", "音乐风格参考", "")}
     </div>`;
   }
+  function seedScriptFromDirection() {
+    const d = chosenDir();
+    if (!d.name && !d.logline) { setMsg("请先在「环节2 · 创意策划」选定一套创意方向"); return; }
+    const hasContent = state.stage3.segments.some(s => s && (s.visual || s.voiceover));
+    if (hasContent && !confirm("已有脚本段落，仍要按创意方向生成新骨架（插入到开头）？")) return;
+    const skeleton = [
+      { time: '00"–', scene: "开场钩子", visual: (d.logline || "") + (d.narrative ? " ｜ " + d.narrative : ""), voiceover: "", sound: "", reference: "" },
+      { time: "–", scene: "发展与铺垫", visual: "围绕核心创意展开情节", voiceover: "", sound: "", reference: "" },
+      { time: "–", scene: "高潮 / 转折", visual: "创意最具冲击力的瞬间", voiceover: "", sound: "", reference: "" },
+      { time: "–", scene: "收尾 / 行动", visual: "呼应开头，落到品牌或行动指令", voiceover: "", sound: "", reference: "" },
+    ];
+    state.stage3.segments = hasContent ? skeleton.concat(state.stage3.segments) : skeleton;
+    save(); rerender();
+    setMsg("⚡ 已按创意方向「" + (d.name || "未命名") + "」生成脚本骨架");
+  }
   function renderStage4() {
     const p = promptStage4();
     const shots = state.stage4.shots;
+    const d4c = chosenDir();
+    const ctx4 = `<div class="cap" style="margin:4px 0 12px">🎯 创意方向：<b>${esc(d4c.name || "未选定")}</b>${d4c.logline ? `（${esc(d4c.logline)}）` : ""} ｜ 👥 受众：${esc(state.meta.audience || "未填")} ｜ 📡 渠道：${esc(state.meta.channel || "未填")} ｜ ⏱ 时长：${esc(state.meta.duration || "未填")}</div>`;
     if (!shots.length) shots.push({});
     const head = `<div class="trow th"><span>镜号</span><span>景别</span><span>运镜</span><span>画面描述</span><span>旁白/台词</span><span>时长(s)</span><span>音效/音乐</span><span>备注/转场</span></div>`;
     let rows = shots.map((s, i) => `
@@ -451,6 +522,7 @@ ${sum}
       </div>`).join("");
     const total = shots.reduce((a, s) => a + (parseFloat(s.duration) || 0), 0);
     return `<h2>🎬 环节4 · 文字分镜</h2><p class="cap">八列分镜表 = 拍摄执行蓝图。</p>
+    ${ctx4}
     ${proPoints(["文字分镜=拍摄蓝图，给导演/摄影/制片。", "标准八列：镜号/景别/运镜/画面/台词/时长/音效/备注。", "广告片15秒约8-12镜；宣传片每分钟约15-25镜。"])}
     ${promptBlock("🤖 本环节 AI 提示词", p)}
     <div class="refresh"><button onclick="App.rerender()">🔄 刷新提示词</button></div>
@@ -1147,7 +1219,7 @@ footer{padding:16px 28px;color:#98a2b3;font-size:12px}
 <div class="bar no-print"><button onclick="window.print()">🖨️ 打印 / 存为 PDF</button><span>由 VIDEO工作流 导出 · ${esc(now)}</span></div>
 <header><h1>${esc(m.project_name || "未命名项目")} · 全案创意方案</h1><div class="meta">${meta}</div></header>
 ${body}
-<footer>本方案由「VIDEO工作流」v2.01 一键导出 · 导出时间 ${esc(now)}</footer>
+<footer>本方案由「VIDEO工作流」v${APP_VERSION} 一键导出 · 导出时间 ${esc(now)}</footer>
 </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { setMsg("⚠️ 浏览器拦截了新窗口，请允许弹出窗口后重试"); return; }
@@ -1156,7 +1228,7 @@ ${body}
   }
   function copyAllPrompts() {
     const names = { 1:"需求提炼", 2:"创意策划", 3:"创意脚本", 4:"文字分镜", 5:"分镜图", 6:"动态分镜", 7:"提报资料", 8:"PPT 整合" };
-    let txt = "【VIDEO工作流 · 全案 AI 提示词包】\n项目：" + (state.meta.project_name || "未命名") + "\n";
+    let txt = "【VIDEO工作流 v" + APP_VERSION + " · 全案 AI 提示词包】\n项目：" + (state.meta.project_name || "未命名") + "\n";
     for (let n = 1; n <= 8; n++) txt += "\n================ 环节" + n + " · " + names[n] + " ================\n" + stagePrompt(n) + "\n";
     navigator.clipboard.writeText(txt).then(() => setMsg("📋 已复制全案 8 环节提示词到剪贴板")).catch(() => setMsg("复制失败，请手动选择"));
   }
@@ -1170,36 +1242,53 @@ ${body}
       return await r.json();
     } catch (e) { setMsg('服务器连接失败: ' + e.message); throw e; }
   }
+  // ---- 本机多项目库（localStorage，纯静态可用）----
+  function _projList() { try { const a = JSON.parse(localStorage.getItem(LS_PROJECTS)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function _projSave(list) { try { localStorage.setItem(LS_PROJECTS, JSON.stringify(list)); } catch (e) {} }
   async function saveProject() {
-    const name = state.meta.project_name || '未命名项目';
-    try { const r = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name, meta: state.meta, stages: state }) }); setMsg('✅ 已保存项目：「' + name + '」（ID: ' + r.id + '）'); } catch (e) {}
+    const name = (state.meta.project_name || "").trim() || "未命名项目";
+    const list = _projList();
+    if (state._projectId) {
+      const i = list.findIndex(p => p.id === state._projectId);
+      if (i >= 0) { list[i].name = name; list[i].client = state.meta.client || ""; list[i].video_type = state.meta.video_type; list[i].updated = new Date().toLocaleString("zh-CN"); list[i].data = JSON.parse(JSON.stringify(state)); _projSave(list); setMsg("✅ 已更新项目：「" + name + "」（本机）"); return; }
+    }
+    const id = "p_" + Date.now().toString(36);
+    state._projectId = id;
+    list.unshift({ id, name, client: state.meta.client || "", video_type: state.meta.video_type, updated: new Date().toLocaleString("zh-CN"), data: JSON.parse(JSON.stringify(state)) });
+    _projSave(list); save();
+    setMsg("✅ 已保存项目：「" + name + "」（本机，可随时载入 / 导出 JSON 备份）");
   }
     async function newProject() {
     if (!confirm('新建空白项目？当前未保存的内容将被清空，已保存的项目库不受影响。')) return;
     try { localStorage.removeItem(LS_KEY); } catch (e) {}
     location.reload();
   }
-async function loadProject() {
-    try {
-      const list = await apiFetch('/api/projects');
-      if (!list.length) { setMsg('暂无已保存项目'); return; }
-      let html = '<div style="padding:16px"><h3 style="margin:0 0 14px">📂 已保存项目</h3>';
-      list.forEach(p => {
-        html += '<div style="background:#141a22;border:1px solid #2a3340;border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
-          + '<div><b style="color:#fff">' + esc(p.name) + '</b><br><span class="cap">' + (p.client || '') + ' · ' + (p.video_type || '') + ' · ' + (p.updated || '') + '</span></div>'
-          + '<div><button class="btn primary" style="margin-right:8px" onclick="App._loadOne(\'' + p.id + '\')">载入</button>'
-          + '<button class="btn" onclick="App._delOne(\'' + p.id + '\')">删除</button></div></div>';
-      });
-      html += '<button class="btn" onclick="App.go(\'project\')">关闭</button></div>';
-      document.getElementById('main').innerHTML = html;
-    } catch (e) {}
+  async function loadProject() {
+    const list = _projList();
+    if (!list.length) { setMsg("暂无已保存项目（点「💾 保存为项目」存到本机）"); return; }
+    let html = '<div style="padding:16px"><h3 style="margin:0 0 6px">📂 本机项目库</h3><p class="cap" style="margin:0 0 14px">项目保存在本浏览器（localStorage），换设备 / 清缓存会丢失；重要项目请用「⬇️ 导出 JSON」备份。</p>';
+    list.forEach(p => {
+      html += '<div style="background:#141a22;border:1px solid #2a3340;border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
+        + '<div><b style="color:#fff">' + esc(p.name) + '</b><br><span class="cap">' + (p.client || '') + ' · ' + (p.video_type || '') + ' · ' + (p.updated || '') + '</span></div>'
+        + '<div><button class="btn primary" style="margin-right:8px" onclick="App._loadOne(\'' + p.id + '\')">载入</button>'
+        + '<button class="btn" onclick="App._delOne(\'' + p.id + '\')">删除</button></div></div>';
+    });
+    html += '<button class="btn" onclick="App.go(\'project\')">关闭</button></div>';
+    document.getElementById('main').innerHTML = html;
   }
   async function _loadOne(id) {
-    try { const d = await apiFetch('/api/projects/' + id); if (d.stages && d.stages.meta) { state = d.stages; save(); current = 'project'; rerender(); setMsg('✅ 已载入项目：「' + (d.name || '') + '」'); } } catch (e) {}
+    const list = _projList();
+    const p = list.find(x => x.id === id);
+    if (!p || !p.data || !p.data.meta) { setMsg("项目数据无效"); return; }
+    state = JSON.parse(JSON.stringify(p.data)); state._projectId = id; save(); current = 'project'; rerender();
+    setMsg('✅ 已载入项目：「' + (p.name || '') + '」');
   }
   async function _delOne(id) {
     if (!confirm('确定删除该项目？此操作不可恢复。')) return;
-    try { await apiFetch('/api/projects/' + id, { method: 'DELETE' }); setMsg('🗑️ 已删除'); loadProject(); } catch (e) {}
+    const list = _projList().filter(p => p.id !== id);
+    _projSave(list);
+    if (state._projectId === id) { delete state._projectId; save(); }
+    loadProject();
   }
   // ===================== 主渲染 =====================
   // ===================== 完整工作流（与分段工作流区分）=====================
@@ -1421,7 +1510,7 @@ async function loadProject() {
 
   // 暴露全局
   window.App = { onInput, onCheck, set, save, rerender, go, copy, addSeg, delSeg, addShot, addBoard, delBoard, buildShotsFromScript, addRef, addActor, delActor, addArt, delArt, addProp, delProp, onType, onImage, exportPPTX, exportJSON, importJSON, reset, setFullMode, runFull, toggleAllPrompts, toggleAITool, _togglePage, _toggleAllPages, _setLock, _uploadLockImg, _genLockImg, _clearLockImg, _setBoardPrompt, _setBoardField, _toggleShotDetail, _regenPrompt, _copyFullPrompt, _genShotImg, _clearShotImg, _setCaseFilter,
-    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch, exportPlan, copyAllPrompts,
+    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch, exportPlan, copyAllPrompts, seedScriptFromDirection, _restoreAutosave,
   };
 
   document.addEventListener("DOMContentLoaded", render);
