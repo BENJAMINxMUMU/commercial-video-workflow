@@ -358,6 +358,7 @@ ${sum}
     <div class="export" style="margin-top:14px">
       <button class="primary" onclick="App.saveProject()">💾 保存为项目</button>
       <button onclick="App.loadProject()">📂 载入项目</button>
+      <button onclick="App.newProject()">🆕 新建项目</button>
     </div>`;
   }
   function renderStage1() {
@@ -1027,7 +1028,12 @@ ${sum}
     const name = state.meta.project_name || '未命名项目';
     try { const r = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name, meta: state.meta, stages: state }) }); setMsg('✅ 已保存项目：「' + name + '」（ID: ' + r.id + '）'); } catch (e) {}
   }
-  async function loadProject() {
+    async function newProject() {
+    if (!confirm('新建空白项目？当前未保存的内容将被清空，已保存的项目库不受影响。')) return;
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    location.reload();
+  }
+async function loadProject() {
     try {
       const list = await apiFetch('/api/projects');
       if (!list.length) { setMsg('暂无已保存项目'); return; }
@@ -1255,7 +1261,7 @@ ${sum}
 
   // 暴露全局
   window.App = { onInput, onCheck, set, save, rerender, go, copy, addSeg, delSeg, addShot, addBoard, delBoard, buildShotsFromScript, addRef, addActor, delActor, addArt, delArt, addProp, delProp, onType, onImage, exportPPTX, exportJSON, importJSON, reset, setFullMode, runFull, toggleAllPrompts, toggleAITool, _togglePage, _toggleAllPages, _setLock, _uploadLockImg, _genLockImg, _clearLockImg, _setBoardPrompt, _setBoardField, _toggleShotDetail, _regenPrompt, _copyFullPrompt, _genShotImg, _clearShotImg, _setCaseFilter,
-    saveProject, loadProject, _loadOne, _delOne, _setSemantic, _semSearch,
+    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch,
   };
 
   document.addEventListener("DOMContentLoaded", render);

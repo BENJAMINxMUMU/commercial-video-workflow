@@ -471,7 +471,7 @@
   <span class="ctx" id="ctx"></span>
   <a class="head-link" href="workflow.html" target="_blank">🗺️ 工作流地图</a>
 </header>
-<div class="verbar">🏷️ 商业视频全案策划引擎 <b>2.0</b> ｜ 更新时间：2026-07-23 20:33</div>
+<div class="verbar">🏷️ 商业视频全案策划引擎 <b>2.01</b> ｜ 更新时间：2026-07-23 21:03</div>
 <div class="layout">
   <nav id="nav"></nav>
   <main id="main"></main>
@@ -843,6 +843,7 @@ ${sum}
     <div class="export" style="margin-top:14px">
       <button class="primary" onclick="App.saveProject()">💾 保存为项目</button>
       <button onclick="App.loadProject()">📂 载入项目</button>
+      <button onclick="App.newProject()">🆕 新建项目</button>
     </div>`;
   }
   function renderStage1() {
@@ -1512,7 +1513,12 @@ ${sum}
     const name = state.meta.project_name || '未命名项目';
     try { const r = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name, meta: state.meta, stages: state }) }); setMsg('✅ 已保存项目：「' + name + '」（ID: ' + r.id + '）'); } catch (e) {}
   }
-  async function loadProject() {
+    async function newProject() {
+    if (!confirm('新建空白项目？当前未保存的内容将被清空，已保存的项目库不受影响。')) return;
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    location.reload();
+  }
+async function loadProject() {
     try {
       const list = await apiFetch('/api/projects');
       if (!list.length) { setMsg('暂无已保存项目'); return; }
@@ -1740,7 +1746,7 @@ ${sum}
 
   // 暴露全局
   window.App = { onInput, onCheck, set, save, rerender, go, copy, addSeg, delSeg, addShot, addBoard, delBoard, buildShotsFromScript, addRef, addActor, delActor, addArt, delArt, addProp, delProp, onType, onImage, exportPPTX, exportJSON, importJSON, reset, setFullMode, runFull, toggleAllPrompts, toggleAITool, _togglePage, _toggleAllPages, _setLock, _uploadLockImg, _genLockImg, _clearLockImg, _setBoardPrompt, _setBoardField, _toggleShotDetail, _regenPrompt, _copyFullPrompt, _genShotImg, _clearShotImg, _setCaseFilter,
-    saveProject, loadProject, _loadOne, _delOne, _setSemantic, _semSearch,
+    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch,
   };
 
   document.addEventListener("DOMContentLoaded", render);
@@ -1748,7 +1754,7 @@ ${sum}
 
 
 </script>
-<footer class="app-footer">🏷️ 商业视频全案策划引擎 <b>2.0</b> ｜ 更新时间：2026-07-23 20:33<br>网页工作台入口（外网）：<a id="entryLink" href="">本工作台外网入口（自动识别）</a></footer>
+<footer class="app-footer">🏷️ 商业视频全案策划引擎 <b>2.01</b> ｜ 更新时间：2026-07-23 21:03<br>网页工作台入口（外网）：<a id="entryLink" href="">本工作台外网入口（自动识别）</a></footer>
 <script>try{var _u=location.href.split("#")[0];var _a=document.getElementById("entryLink");if(_a){_a.href=_u;_a.textContent=_u;}}catch(e){}</script>
 </body>
 </html>
