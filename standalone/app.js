@@ -359,6 +359,8 @@ ${sum}
       <button class="primary" onclick="App.saveProject()">💾 保存为项目</button>
       <button onclick="App.loadProject()">📂 载入项目</button>
       <button onclick="App.newProject()">🆕 新建项目</button>
+      <button class="primary" onclick="App.exportPlan()">📤 导出全案</button>
+      <button onclick="App.copyAllPrompts()">📋 复制全案提示词</button>
     </div>`;
   }
   function renderStage1() {
@@ -1015,6 +1017,150 @@ ${sum}
   function importJSON() { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/json"; inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { const d = JSON.parse(ev.target.result); Object.assign(state, d); save(); rerender(); setMsg("✅ 已导入"); } catch (err) { setMsg("导入失败：" + err); } }; r.readAsText(f); }; inp.click(); }
   function reset() { if (confirm("确定清空所有内容？")) { state = defaultState(); save(); current = "project"; rerender(); } }
 
+  // ===================== 导出全案 / 复制提示词（v2.01 交付能力）=====================
+  function _expKV(rows) {
+    const f = rows.filter(r => r[1] != null && String(r[1]).trim() !== "");
+    if (!f.length) return '<p class="muted">（未填写）</p>';
+    return '<table class="ex">' + f.map(r => `<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join("") + '</table>';
+  }
+  function expStage1Html() {
+    const b = state.stage1.brd || {};
+    let h = `<p class="raw">${esc(state.stage1.raw_need || "（未填写客户原始需求）")}</p>`;
+    h += _expKV([["项目定位", b.positioning],["核心目标", b.core_goal],["目标受众", b.audience],["必传信息", b.must_info],["风格倾向", b.style],["约束条件", b.constraints],["隐性需求推断", b.hidden]]);
+    return h;
+  }
+  function expStage2Html() {
+    const dirs = state.stage2.directions || [];
+    const chosen = state.stage2.chosen || 0;
+    if (!dirs.length) return '<p class="muted">（未填写创意方向）</p>';
+    return dirs.map((d, i) => {
+      const extra = Object.keys(d).filter(k => k !== "name")
+        .map(k => `<div class="kv"><b>${esc(k)}：</b>${esc(d[k])}</div>`).join("");
+      return `<div class="dir${i === chosen ? " chosen" : ""}"><b>方向 ${i + 1}：${esc(d.name || "未命名")}</b>${i === chosen ? ' <span class="tag">已选定</span>' : ""}${extra}</div>`;
+    }).join("");
+  }
+  function expStage3Html() {
+    const segs = state.stage3.segments || [];
+    if (!segs.length) return '<p class="muted">（未填写脚本段落）</p>';
+    return segs.map((s, i) => `<div class="seg"><b>段落 ${i + 1} ${s.time ? "· " + esc(s.time) : ""}</b>${_expKV([["场景", s.scene],["画面", s.visual],["旁白/台词", s.voiceover],["声音设计", s.sound],["参考片", s.reference]])}</div>`).join("");
+  }
+  function expStage4Html() {
+    const shots = state.stage4.shots || [];
+    if (!shots.length) return '<p class="muted">（未填写分镜表）</p>';
+    const head = "<tr><th>镜号</th><th>景别</th><th>运镜</th><th>画面描述</th><th>旁白/台词</th><th>时长</th><th>音效/音乐</th><th>备注</th></tr>";
+    const rows = shots.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.shot_size || "")}</td><td>${esc(s.movement || "")}</td><td>${esc(s.desc || "")}</td><td>${esc(s.dialogue || "")}</td><td>${esc(s.duration || 0)}</td><td>${esc(s.sound || "")}</td><td>${esc(s.note || "")}</td></tr>`).join("");
+    return '<table class="shot"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>';
+  }
+  function expStage5Html() {
+    const l = state.stage5.style_lock || {};
+    const labels = { char: "人物设定", scene: "主场景设定", style: "整体视觉风格", tone: "影调" };
+    let h = '<div class="locks">';
+    ["char", "scene", "style", "tone"].forEach(k => {
+      const img = l[k + "_img"] || "";
+      h += `<div class="lock"><b>${labels[k]}</b>${img ? `<img src="${img}" alt="${labels[k]}">` : ""}<div class="kv">${esc(l[k] || "（未填写）")}</div></div>`;
+    });
+    h += '</div>';
+    const boards = state.stage5.boards || [];
+    if (boards.length) {
+      h += '<h4>逐镜分镜图</h4>';
+      h += boards.map((b, i) => {
+        const img = b.image_data || "";
+        const ov = [b.shot_size_override, b.movement_override, b.desc_override].filter(Boolean).join(" / ");
+        return `<div class="board"><b>镜 ${i + 1}</b>${img ? `<img src="${img}" alt="镜 ${i + 1}">` : ""}<div class="kv">${esc(ov || b.gen_prompt || "（未生成）")}</div></div>`;
+      }).join("");
+    }
+    return h;
+  }
+  function expStage6Html() {
+    const s = state.stage6;
+    return _expKV([["剪辑时序/时间线", s.timeline],["Ken Burns 效果", s.kb_effects],["转场方案", s.transitions],["声音设计", s.sound_design],["节奏校验点", s.beat_points],["初剪自检清单", s.checklist]]);
+  }
+  function expStage7Html() {
+    const s7 = state.stage7;
+    let h = _expKV([["情绪基调", s7.mood],["影片年代/背景", s7.era]]);
+    const refs = (s7.style_refs || []).filter(r => r);
+    if (refs.length) h += '<div class="kv"><b>参考片：</b>' + refs.map(r => esc(r)).join("；") + '</div>';
+    const block = (title, arr, keys) => {
+      if (!arr || !arr.length) return "";
+      return `<h4>${title}</h4>` + arr.map(o => `<div class="kv">${keys.map(k => o[k] ? `<b>${esc(k)}：</b>${esc(o[k])} ` : "").join("")}</div>`).join("");
+    };
+    h += block("角色设定", s7.actors, ["name", "age", "job", "trait", "look", "actor_ref", "costume", "makeup"]);
+    h += block("核心场景", s7.art_set, ["name", "func", "space", "tone", "set_ref", "budget"]);
+    h += block("关键道具", s7.props, ["name", "scene", "meaning", "look", "prepare"]);
+    return h;
+  }
+  function expStage8Html() {
+    const s = state.stage8;
+    let h = _expKV([["PPT 主标题", s.ppt_title],["PPT 副标题", s.ppt_subtitle],["联系方式", s.contact],["排期说明", s.schedule_text],["团队说明", s.team_text]]);
+    const chk = s._checked_pages || {};
+    const ids = Object.keys(chk).filter(k => chk[k]);
+    if (ids.length) h += '<div class="kv"><b>已确认页面：</b>' + ids.join("、") + '</div>';
+    return h;
+  }
+  function exportPlan() {
+    const m = state.meta;
+    const A = m.accent_color || "#C8102E";
+    const now = new Date().toLocaleString("zh-CN");
+    const secs = [
+      [1, "需求提炼", expStage1Html()], [2, "创意策划", expStage2Html()], [3, "创意脚本", expStage3Html()],
+      [4, "文字分镜", expStage4Html()], [5, "分镜图", expStage5Html()], [6, "动态分镜", expStage6Html()],
+      [7, "提报资料", expStage7Html()], [8, "PPT 整合", expStage8Html()],
+    ];
+    let body = "";
+    secs.forEach(([n, t, html]) => {
+      body += `<section><h2><span class="num" style="background:${A}">${n}</span>${esc(t)}</h2>${html}<div class="prompt"><div class="prompt-bar"><span>🤖 本环节 AI 提示词</span></div><pre>${esc(stagePrompt(n))}</pre></div></section>`;
+    });
+    const meta = `<span>客户/品牌：${esc(m.client || "—")}</span><span>类型：${esc(m.video_type)}</span><span>时长：${esc(m.duration || "—")}</span><span>画幅：${esc(m.aspect_ratio)}</span><span>渠道：${esc(m.channel || "—")}</span><span>受众：${esc(m.audience || "—")}</span>`;
+    const doc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(m.project_name || "商业视频创意方案")} · 全案</title><style>
+*{box-sizing:border-box} body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#1f2733;margin:0;background:#fff;line-height:1.6}
+.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 20px;display:flex;gap:14px;align-items:center}
+.bar button{background:${A};color:#fff;border:0;padding:8px 16px;border-radius:8px;font-size:14px;cursor:pointer}
+.bar span{color:#667085;font-size:13px}
+header{padding:28px 28px 18px;border-bottom:3px solid ${A};margin:0 0 8px}
+header h1{margin:0 0 10px;font-size:26px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:#475467;font-size:13px}
+section{padding:18px 28px;border-bottom:1px solid #f0f0f0}
+section h2{font-size:19px;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;color:#fff;font-size:14px;font-weight:700}
+.raw{background:#f7f8fa;border-left:3px solid ${A};padding:10px 12px;white-space:pre-wrap;font-size:13px;color:#344054}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+table.ex th,table.ex td{border:1px solid #e5e7eb;padding:7px 10px;text-align:left;vertical-align:top}
+table.ex th{background:#f7f8fa;width:120px;font-weight:600;white-space:nowrap}
+table.shot th,table.shot td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top;font-size:12px}
+table.shot{table-layout:fixed}
+.kv{margin:4px 0;font-size:13px}
+.kv b{color:#344054}
+.muted{color:#98a2b3;font-style:italic;font-size:13px}
+.dir,.seg{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin:8px 0}
+.dir.chosen{border-color:${A};background:#fff7f8}
+.tag{background:${A};color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:6px}
+.locks{display:flex;flex-wrap:wrap;gap:12px}
+.lock{flex:1 1 220px;border:1px solid #e5e7eb;border-radius:8px;padding:10px}
+.lock img,.board img{max-width:100%;border-radius:6px;margin:6px 0;display:block}
+.board{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin:8px 0}
+.prompt{margin-top:14px;background:#fbfbfd;border:1px solid #eceef1;border-radius:8px;overflow:hidden}
+.prompt-bar{background:#f1f3f5;padding:6px 12px;font-size:13px;font-weight:600;color:#344054}
+.prompt pre{margin:0;padding:12px;white-space:pre-wrap;word-break:break-word;font-size:12.5px;color:#1f2733}
+footer{padding:16px 28px;color:#98a2b3;font-size:12px}
+@media print{.bar{display:none}section{page-break-inside:avoid}}
+</style></head><body>
+<div class="bar no-print"><button onclick="window.print()">🖨️ 打印 / 存为 PDF</button><span>由 VIDEO工作流 导出 · ${esc(now)}</span></div>
+<header><h1>${esc(m.project_name || "未命名项目")} · 全案创意方案</h1><div class="meta">${meta}</div></header>
+${body}
+<footer>本方案由「VIDEO工作流」v2.01 一键导出 · 导出时间 ${esc(now)}</footer>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { setMsg("⚠️ 浏览器拦截了新窗口，请允许弹出窗口后重试"); return; }
+    w.document.open(); w.document.write(doc); w.document.close();
+    setMsg("📤 已生成全案文档（新标签页，可打印/存为 PDF）");
+  }
+  function copyAllPrompts() {
+    const names = { 1:"需求提炼", 2:"创意策划", 3:"创意脚本", 4:"文字分镜", 5:"分镜图", 6:"动态分镜", 7:"提报资料", 8:"PPT 整合" };
+    let txt = "【VIDEO工作流 · 全案 AI 提示词包】\n项目：" + (state.meta.project_name || "未命名") + "\n";
+    for (let n = 1; n <= 8; n++) txt += "\n================ 环节" + n + " · " + names[n] + " ================\n" + stagePrompt(n) + "\n";
+    navigator.clipboard.writeText(txt).then(() => setMsg("📋 已复制全案 8 环节提示词到剪贴板")).catch(() => setMsg("复制失败，请手动选择"));
+  }
+
   // ===================== 项目库（服务器端） =====================
   const API_BASE2 = '/api';
   async function apiFetch(url, opts) {
@@ -1275,7 +1421,7 @@ async function loadProject() {
 
   // 暴露全局
   window.App = { onInput, onCheck, set, save, rerender, go, copy, addSeg, delSeg, addShot, addBoard, delBoard, buildShotsFromScript, addRef, addActor, delActor, addArt, delArt, addProp, delProp, onType, onImage, exportPPTX, exportJSON, importJSON, reset, setFullMode, runFull, toggleAllPrompts, toggleAITool, _togglePage, _toggleAllPages, _setLock, _uploadLockImg, _genLockImg, _clearLockImg, _setBoardPrompt, _setBoardField, _toggleShotDetail, _regenPrompt, _copyFullPrompt, _genShotImg, _clearShotImg, _setCaseFilter,
-    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch,
+    saveProject, loadProject, newProject, _loadOne, _delOne, _setSemantic, _semSearch, exportPlan, copyAllPrompts,
   };
 
   document.addEventListener("DOMContentLoaded", render);
