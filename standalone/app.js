@@ -33,6 +33,63 @@
   const SHOT_SIZES = ["WS 远景", "FS 全景", "MS 中景", "MCU 近景", "CU 特写", "ECU 大特写"];
   const CAMERA_MOVES = ["固定", "推 Push in", "拉 Pull out", "横摇 Pan", "竖摇 Tilt", "平移 Track", "跟拍 Follow", "升降 Crane", "环绕 Orbit", "手持 Handheld"];
 
+  // ===================== 影片类型 → 策划方式（4 类）=====================
+  // 需求提炼方法与创意策划侧重点按「方式」区分，而非按单一类型。
+  const TYPE_MODES = {
+    story: {
+      name: "情感/故事驱动型",
+      types: ["广告片", "微电影"],
+      req: "需求提炼聚焦：① 品牌想让人记住的「一个记忆点」；② 目标受众的情感触发点（共鸣/向往/幽默/震撼）；③ 品牌/产品以何种方式（主角/背景/转折点）自然融入故事，而非硬广；④ 期望的情绪曲线与看完后的行动。",
+      brdHint: "广告片重「单一强记忆点 + 情绪冲击」；微电影重「人物弧光 + 品牌作为故事背景」。",
+      creative: "创意策划侧重点：用「一句话创意锚定情绪」，3 套方向分别测试不同情绪钩子与叙事结构；强调「品牌即故事」而非「故事里插品牌」；参考片优先看情绪表达与叙事手法。",
+      brdEmphasis: { core_goal: "→ 记忆点", audience: "→ 情感触发点", must_info: "→ 自然植入方式", hidden: "→ 情绪曲线" },
+    },
+    value: {
+      name: "价值/卖点驱动型",
+      types: ["企业宣传片", "产品宣传片"],
+      req: "需求提炼聚焦：① 企业/产品最想传递的「核心价值主张」；② 目标受众的决策顾虑与信任来源；③ 必传信息按「决策权重」排序（不是罗列）；④ 需要提供信任凭证（数据/案例/资质/背书）。",
+      brdHint: "企业宣传片重「组织价值 + 信任感」；产品宣传片重「卖点层级 + 功能可视化」。",
+      creative: "创意策划侧重点：3 套方向围绕「不同价值切入角度」（技术领先 / 用户口碑 / 社会价值）；强调「结构化卖点 + 可视化呈现」；参考片优先看信息层级与信服力表达。",
+      brdEmphasis: { core_goal: "→ 价值主张", audience: "→ 决策顾虑", must_info: "→ 按决策权重排序", hidden: "→ 信任凭证" },
+    },
+    flow: {
+      name: "流量/转化驱动型",
+      types: ["短视频", "口播"],
+      req: "需求提炼聚焦：① 前三秒必须抓人的「钩子类型」（提问/反差/结果前置/痛点）；② 目标受众的滑走原因与完播动机；③ 明确的转化目标（点赞/关注/购买/留资）与 CTA；④ 平台特性（竖屏 / 静音可懂 / 字幕）。",
+      brdHint: "短视频重「钩子 + 完播 + 转化」；口播重「人设信任 + 强节奏 + 强转化」。",
+      creative: "创意策划侧重点：3 套方向分别测试不同「钩子类型 + 结构节奏」；强调「开头即高潮」与「每 15 秒一个信息点」；参考片优先看爆款开头与节奏设计。",
+      brdEmphasis: { core_goal: "→ 钩子类型", audience: "→ 滑走原因/完播动机", must_info: "→ CTA", hidden: "→ 平台特性" },
+    },
+    series: {
+      name: "爽感/连载驱动型",
+      types: ["AI漫剧"],
+      req: "需求提炼聚焦：① 目标受众的「爽点偏好」（逆袭/打脸/甜宠/悬疑）；② 付费/追更的转化节点设计；③ 人设与世界观的一致性要求（跨集 AI 生成）；④ 单集时长与悬念钩子结构。",
+      brdHint: "AI漫剧重「爽点结构 + 付费转化 + 跨集一致性」。",
+      creative: "创意策划侧重点：3 套方向围绕不同「爽点 + 反转结构」；强调「每集结尾强悬念」与「人设/画风跨集一致」（给定参考图与风格锁）；参考片优先看爆款爽剧结构与反转节奏。",
+      brdEmphasis: { core_goal: "→ 爽点偏好", audience: "→ 付费动机", must_info: "→ 悬念钩子", hidden: "→ 跨集一致性" },
+    },
+  };
+  function typeMode() {
+    const t = state.meta.video_type;
+    return Object.values(TYPE_MODES).find(m => m.types.includes(t)) || TYPE_MODES.story;
+  }
+  function brdLabel(k) { const m = { positioning: "项目定位", core_goal: "核心目标", audience: "目标受众", must_info: "必传信息", style: "风格倾向", constraints: "约束条件", hidden: "隐性需求" }; return m[k] || k; }
+  function modeCard1(m) {
+    const chips = Object.entries(m.brdEmphasis).map(([k, v]) => `<span style="display:inline-block;margin:3px 6px 3px 0;padding:2px 9px;background:#fff;border:1px solid #d6e4ff;border-radius:12px;font-size:12px">${brdLabel(k)} <b>${esc(v)}</b></span>`).join("");
+    return `<div class="card" style="border-color:#d6e4ff;background:#f5f8ff;margin:4px 0 14px">
+      <b>🎯 本类型需求提炼方法 · ${esc(m.name)}</b>
+      <p class="cap" style="margin:6px 0">${esc(m.req)}</p>
+      <p class="cap" style="margin:0;color:#5f6368">${esc(m.brdHint)}</p>
+      <div style="margin-top:8px;font-size:12px;color:#344054"><b>BRD 填写侧重：</b><br>${chips}</div>
+    </div>`;
+  }
+  function modeCard2(m) {
+    return `<div class="card" style="border-color:#ead6ff;background:#faf5ff;margin:4px 0 14px">
+      <b>🎯 本类型创意策划侧重点 · ${esc(m.name)}</b>
+      <p class="cap" style="margin:6px 0 0">${esc(m.creative)}</p>
+    </div>`;
+  }
+
   // ===================== AI 工具目录 =====================
   // 每个工具含 name/icon/url/tag/stages（stages 为空 = 全环节通用）
   const AI_TOOLS = [
@@ -105,7 +162,7 @@
   const LS_KEY = "cv_workflow_state_v1";
   const LS_PROJECTS = "cv_workflow_projects_v1";   // 本机多项目库
   const LS_AUTOSAVE = "cv_workflow_autosave_v1";    // 自动存档快照
-  const APP_VERSION = "2.03";
+  const APP_VERSION = "2.04";
   function defaultState() {
     return {
       meta: { project_name: "", client: "", video_type: "广告片", duration: "30秒",
@@ -169,6 +226,10 @@
 6. 约束条件：时长、预算量级、交付周期、明确禁忌
 7. 隐性需求推断：客户没说但实际需要的是什么（用商业逻辑推导）
 
+【本类型需求提炼方法 · ${typeMode().name}】
+${typeMode().req}
+${typeMode().brdHint}
+
 要求：专业、精炼，每条不超过30字；隐性需求部分标注“推断”`;
   }
   function promptStage2() {
@@ -178,6 +239,9 @@ ${brdText() || "（待填写需求简报）"}
 【影片类型】${state.meta.video_type}
 【时长】${state.meta.duration}
 ${extraBlock()}
+
+【本类型创意策划侧重点 · ${typeMode().name}】
+${typeMode().creative}
 
 每套方向按以下结构输出：
 ■ 方向名称：（四字以内）
@@ -414,7 +478,9 @@ ${sum}
   function renderStage1() {
     const p = promptStage1();
     const b = state.stage1.brd;
+    const m1 = typeMode();
     return `<h2>📋 环节1 · 需求提炼</h2><p class="cap">把客户原话提炼成可执行的《需求简报 BRD》。</p>
+    ${modeCard1(m1)}
     ${proPoints(["用结构化问卷替代自由访谈，必问7项。", "区分“客户说要的”和“客户真正需要的”。", "输出《需求简报 BRD》：背景/目标/受众/诉求/禁忌。"])}
     <label class="lbl">① 客户原始需求 / 会议纪要</label><textarea oninput="App.set('stage1.raw_need',this.value);App.save()" placeholder="粘贴客户原话、微信记录、brief…">${esc(state.stage1.raw_need)}</textarea>
     ${promptBlock("🤖 本环节 AI 提示词（复制给大模型）", p)}
@@ -431,6 +497,7 @@ ${sum}
   function renderStage2() {
     const p = promptStage2();
     const dirs = state.stage2.directions;
+    const m2 = typeMode();
     while (dirs.length < 3) dirs.push({});
     const ex = VIDEO_TYPES[state.meta.video_type].extra.map(e => field("stage2.extra." + jsonKey(e[0]), "差异化参数 · " + e[0], e[1])).join("");
     const chosen = Math.min(state.stage2.chosen || 0, dirs.length - 1);
@@ -445,6 +512,7 @@ ${sum}
         ${field("stage2.directions." + i + ".references", "参考片链接", "", "area")}
       </div>`).join("");
     return `<h2>💡 环节2 · 创意策划</h2><p class="cap">产出 3 套差异化方向，客户选定一套进入脚本细化。</p>
+    ${modeCard2(m2)}
     ${proPoints(["商业视频五大创意范式。", "至少 3 套差异化方向（保守/冒险/平衡），给客户选择感。", "每套附：创意概念+叙事结构+风格关键词+参考片。"])}
     ${ex}
     ${renderAITools("stage2")}
