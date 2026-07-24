@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作流画布 · 商业视频制作流程</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --panel:#ffffff; --ink:#1f2733; --muted:#6b7686;
+    --line:#d7deea; --accent:#3b6cff; --accent-soft:#e8efff;
+    --danger:#e5484d; --ok:#21a366; --shadow:0 6px 20px rgba(31,39,51,.10);
+    --node:#ffffff; --node-bd:#dde3ee;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); overflow:hidden;
+  }
+  /* 顶栏 */
+  .topbar{
+    position:fixed; inset:0 0 auto 0; height:56px; z-index:30;
+    display:flex; align-items:center; gap:10px; padding:0 16px;
+    background:var(--panel); border-bottom:1px solid var(--line); box-shadow:var(--shadow);
+  }
+  .topbar h1{font-size:16px; margin:0; font-weight:700; letter-spacing:.3px}
+  .topbar .sub{font-size:12px; color:var(--muted); margin-left:2px}
+  .spacer{flex:1}
+  .btn{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:7px 12px; border-radius:9px; font-size:13px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px; transition:.15s; white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent); color:var(--accent)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{filter:brightness(1.05); color:#fff}
+  .btn.ghost{background:transparent}
+  .btn.danger:hover{border-color:var(--danger); color:var(--danger)}
+  .count{font-size:12px; color:var(--muted); background:var(--accent-soft);
+    padding:4px 10px; border-radius:20px; font-weight:600}
+
+  /* 画布 */
+  .stage{position:absolute; inset:56px 0 0 0; overflow:hidden;
+    background:
+      radial-gradient(circle, #dfe5f0 1px, transparent 1px) 0 0/22px 22px,
+      var(--bg);
+    cursor:grab;
+  }
+  .stage.panning{cursor:grabbing}
+  .world{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform}
+  svg.links{position:absolute; top:0; left:0; overflow:visible; pointer-events:none}
+  .link{fill:none; stroke:var(--accent); stroke-width:2.5; opacity:.55}
+  .link-hit{fill:none; stroke:transparent; stroke-width:14}
+  .arrow{fill:var(--accent); opacity:.7}
+
+  /* 节点 */
+  .node{
+    position:absolute; width:210px; background:var(--node);
+    border:1px solid var(--node-bd); border-radius:14px; padding:12px 12px 10px;
+    box-shadow:var(--shadow); cursor:grab; user-select:none; transition:box-shadow .15s,border-color .15s;
+  }
+  .node:hover{border-color:var(--accent)}
+  .node.sel{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+  .node.dragging{cursor:grabbing; box-shadow:0 12px 30px rgba(31,39,51,.22)}
+  .node .row{display:flex; align-items:flex-start; gap:9px}
+  .node .ic{font-size:22px; line-height:1; width:30px; height:30px; flex:none;
+    display:flex; align-items:center; justify-content:center; background:var(--accent-soft);
+    border-radius:9px}
+  .node .ttl{font-weight:700; font-size:14px; line-height:1.25; flex:1; word-break:break-word}
+  .node .idx{font-size:11px; color:var(--muted); font-weight:700}
+  .node .desc{margin-top:7px; font-size:12px; color:var(--muted); line-height:1.45;
+    max-height:54px; overflow:hidden; word-break:break-word}
+  .node .tools{display:flex; gap:4px; margin-top:9px; opacity:0; transition:.15s}
+  .node:hover .tools,.node.sel .tools{opacity:1}
+  .mini{border:1px solid var(--line); background:#fff; border-radius:7px; width:28px; height:26px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:var(--muted)}
+  .mini:hover{border-color:var(--accent); color:var(--accent)}
+  .mini.del:hover{border-color:var(--danger); color:var(--danger)}
+
+  /* 右侧编辑面板 */
+  .panel{
+    position:fixed; top:56px; right:0; bottom:0; width:320px; background:var(--panel);
+    border-left:1px solid var(--line); box-shadow:-8px 0 24px rgba(31,39,51,.06);
+    transform:translateX(100%); transition:transform .22s ease; z-index:25; padding:18px; overflow:auto;
+  }
+  .panel.open{transform:translateX(0)}
+  .panel h3{margin:0 0 14px; font-size:15px; display:flex; align-items:center; gap:8px}
+  .field{margin-bottom:14px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600}
+  .field input,.field textarea{
+    width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 10px;
+    font-size:13px; font-family:inherit; color:var(--ink); background:#fff; resize:vertical;
+  }
+  .field input:focus,.field textarea:focus{outline:none; border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft)}
+  .emoji-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .emoji-row span{font-size:20px; width:34px; height:34px; display:flex; align-items:center;
+    justify-content:center; border:1px solid var(--line); border-radius:8px; cursor:pointer}
+  .emoji-row span:hover{border-color:var(--accent)}
+  .emoji-row span.on{border-color:var(--accent); background:var(--accent-soft)}
+  .panel .actions{display:flex; gap:8px; margin-top:6px}
+  .panel .close{position:absolute; top:14px; right:14px; cursor:pointer; color:var(--muted);
+    font-size:18px; border:none; background:none}
+
+  /* 底部提示 / 空状态 */
+  .hint{position:fixed; left:16px; bottom:14px; z-index:20; font-size:12px; color:var(--muted);
+    background:rgba(255,255,255,.85); border:1px solid var(--line); padding:6px 12px; border-radius:20px}
+  .empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:12px; color:var(--muted); font-size:14px; pointer-events:none}
+
+  /* 导入隐藏 */
+  #fileInput{display:none}
+  .toast{position:fixed; top:68px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:9px 16px; border-radius:10px; font-size:13px;
+    opacity:0; transition:.25s; z-index:50; pointer-events:none}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>工作流画布</h1>
+    <span class="sub">商业视频制作流程 · 可增删 / 拖拽 / 排序</span>
+    <span class="count" id="count">0 个步骤</span>
+    <div class="spacer"></div>
+    <button class="btn primary" id="addBtn">＋ 添加步骤</button>
+    <button class="btn" id="autoBtn">自动排版</button>
+    <button class="btn" id="fitBtn">适应屏幕</button>
+    <button class="btn ghost" id="exportBtn">导出</button>
+    <button class="btn ghost" id="importBtn">导入</button>
+    <button class="btn danger" id="resetBtn">重置默认</button>
+    <input type="file" id="fileInput" accept="application/json">
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="world" id="world">
+      <svg class="links" id="links"></svg>
+      <!-- 节点由 JS 渲染 -->
+    </div>
+    <div class="empty" id="empty" style="display:none">
+      <div>画布为空</div>
+      <div style="font-size:13px">点击右上角「＋ 添加步骤」开始搭建你的工作流</div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <button class="close" id="panelClose">✕</button>
+    <h3>编辑步骤</h3>
+    <div class="field">
+      <label>图标</label>
+      <input id="fIcon" maxlength="4" placeholder="输入 emoji，或点选下方">
+      <div class="emoji-row" id="emojiRow"></div>
+    </div>
+    <div class="field">
+      <label>步骤标题</label>
+      <input id="fTitle" placeholder="例如：需求提炼">
+    </div>
+    <div class="field">
+      <label>说明 / 子标题</label>
+      <textarea id="fDesc" rows="3" placeholder="这一步要做什么、产出什么"></textarea>
+    </div>
+    <div class="field">
+      <label>在流程中的位置</label>
+      <div style="display:flex; gap:8px">
+        <button class="btn" id="upBtn" style="flex:1">↑ 上移</button>
+        <button class="btn" id="downBtn" style="flex:1">↓ 下移</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn danger" id="delBtn" style="flex:1">删除此步骤</button>
+    </div>
+  </div>
+
+  <div class="hint">拖拽节点移动 · 拖拽空白处平移画布 · 滚轮缩放 · 点击节点编辑</div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const LS_KEY = "commercial_video_workflow_canvas_v1";
+  const NODE_W = 210;
+  const EMOJIS = ["⚙️","📋","💡","📝","🎬","🖼️","🎞️","🎨","📊","🔍","🗂️","🧩","🚀","✅","📞","🧠","🛠️","🎯","📁","⭐"];
+
+  const DEFAULT_STEPS = [
+    {icon:"⚙️", title:"项目设置", desc:"全局上下文：品牌、预算、周期、目标"},
+    {icon:"📋", title:"需求提炼", desc:"结构化 BRD：受众、目标、约束"},
+    {icon:"💡", title:"创意策划", desc:"产出 3 套方向，锚定一句话创意"},
+    {icon:"📝", title:"创意脚本", desc:"文学脚本 + 参考"},
+    {icon:"🎬", title:"文字分镜", desc:"八列分镜表"},
+    {icon:"🖼️", title:"分镜图", desc:"故事板 + 视觉一致性"},
+    {icon:"🎞️", title:"动态分镜", desc:"Animatic 节奏校验"},
+    {icon:"🎨", title:"提报资料", desc:"影调 / 美术 / 服化道"},
+    {icon:"📊", title:"PPT 整合", desc:"导出 15 页方案"}
+  ];
+
+  // ---- 状态 ----
+  let state = { steps: [], pan:{x:40,y:40}, zoom:1 };
+  let selId = null;
+  let uid = 1;
+
+  const $ = s => document.querySelector(s);
+  const stage = $("#stage"), world = $("#world"), svg = $("#links");
+  const emptyEl = $("#empty"), countEl = $("#count");
+
+  function newId(){ return "s"+(uid++)+"_"+Math.random().toString(36).slice(2,6); }
+
+  function seedDefault(){
+    state.steps = DEFAULT_STEPS.map(s=>({id:newId(), icon:s.icon, title:s.title, desc:s.desc, x:0, y:0}));
+    autoLayout(false);
+  }
+
+  // ---- 持久化 ----
+  function save(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify({steps:state.steps, pan:state.pan, zoom:state.zoom, uid})); }
+    catch(e){ toast("保存失败："+e.message); }
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return false;
+      const d = JSON.parse(raw);
+      if(!d.steps || !d.steps.length) return false;
+      state.steps = d.steps.map(s=>({id:s.id||newId(), icon:s.icon||"⚙️", title:s.title||"未命名", desc:s.desc||"", x:s.x||0, y:s.y||0}));
+      state.pan = d.pan || {x:40,y:40};
+      state.zoom = d.zoom || 1;
+      uid = d.uid || (state.steps.length+1);
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // ---- 渲染 ----
+  function applyTransform(){
+    world.style.transform = `translate(${state.pan.x}px,${state.pan.y}px) scale(${state.zoom})`;
+  }
+
+  function render(){
+    // 移除旧节点
+    [...world.querySelectorAll(".node")].forEach(n=>n.remove());
+    state.steps.forEach((s,i)=>{
+      const el = document.createElement("div");
+      el.className = "node" + (s.id===selId?" sel":"");
+      el.dataset.id = s.id;
+      el.style.left = s.x+"px";
+      el.style.top = s.y+"px";
+      el.innerHTML = `
+        <div class="row">
+          <div class="ic">${esc(s.icon||"⚙️")}</div>
+          <div style="flex:1">
+            <div class="idx">步骤 ${i+1}</div>
+            <div class="ttl">${esc(s.title)}</div>
+          </div>
+        </div>
+        <div class="desc">${esc(s.desc)}</div>
+        <div class="tools">
+          <div class="mini" data-act="edit" title="编辑">✎</div>
+          <div class="mini" data-act="up" title="上移">↑</div>
+          <div class="mini" data-act="down" title="下移">↓</div>
+          <div class="mini del" data-act="del" title="删除">🗑</div>
+        </div>`;
+      world.appendChild(el);
+      bindNode(el, s);
+    });
+    countEl.textContent = state.steps.length + " 个步骤";
+    emptyEl.style.display = state.steps.length ? "none" : "flex";
+    applyTransform();
+    drawLinks();
+    save();
+  }
+
+  function nodeEl(id){ return world.querySelector(`.node[data-id="${id}"]`); }
+
+  function drawLinks(){
+    // 读取每个节点真实尺寸
+    const pts = state.steps.map(s=>{
+      const el = nodeEl(s.id);
+      const w = el?el.offsetWidth:NODE_W, h = el?el.offsetHeight:90;
+      return {x:s.x, y:s.y, w, h, cx:s.x+w/2, cy:s.y+h/2};
+    });
+    let html = "";
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i], b=pts[i+1];
+      const horiz = Math.abs(b.cx-a.cx) >= Math.abs(b.cy-a.cy);
+      let sx,sy,tx,ty,c1x,c1y,c2x,c2y;
+      if(horiz){
+        if(b.cx>=a.cx){ sx=a.x+a.w; sy=a.cy; tx=b.x; ty=b.cy; }
+        else { sx=a.x; sy=a.cy; tx=b.x+b.w; ty=b.cy; }
+        const mx=(sx+tx)/2;
+        c1x=mx; c1y=sy; c2x=mx; c2y=ty;
+      }else{
+        if(b.cy>=a.cy){ sx=a.cx; sy=a.y+a.h; tx=b.cx; ty=b.y; }
+        else { sx=a.cx; sy=a.y; tx=b.cx; ty=b.y+b.h; }
+        const my=(sy+ty)/2;
+        c1x=sx; c1y=my; c2x=tx; c2y=my;
+      }
+      const d=`M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${tx} ${ty}`;
+      html += `<path class="link" d="${d}"/>`;
+      // 箭头
+      const ang = Math.atan2(ty-c2y, tx-c2x);
+      const ah=8;
+      const ax1=tx-ah*Math.cos(ang-Math.PI/7), ay1=ty-ah*Math.sin(ang-Math.PI/7);
+      const ax2=tx-ah*Math.cos(ang+Math.PI/7), ay2=ty-ah*Math.sin(ang+Math.PI/7);
+      html += `<path class="arrow" d="M ${tx} ${ty} L ${ax1} ${ay1} L ${ax2} ${ay2} Z"/>`;
+    }
+    svg.innerHTML = html;
+  }
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+  // ---- 节点交互 ----
+  function bindNode(el, s){
+    el.addEventListener("mousedown", e=>{
+      if(e.target.closest(".tools")) return; // 工具按钮单独处理
+      e.stopPropagation();
+      select(s.id);
+      startNodeDrag(e, s, el);
+    });
+    el.addEventListener("dblclick", e=>{ e.stopPropagation(); openPanel(s.id); });
+    el.querySelectorAll(".mini").forEach(m=>{
+      m.addEventListener("click", e=>{
+        e.stopPropagation();
+        const act = m.dataset.act;
+        if(act==="edit") openPanel(s.id);
+        else if(act==="del") deleteStep(s.id);
+        else if(act==="up") reorder(s.id,-1);
+        else if(act==="down") reorder(s.id,1);
+      });
+    });
+  }
+
+  function startNodeDrag(e, s, el){
+    const startX=e.clientX, startY=e.clientY, ox=s.x, oy=s.y;
+    el.classList.add("dragging");
+    function move(ev){
+      const dx=(ev.clientX-startX)/state.zoom, dy=(ev.clientY-startY)/state.zoom;
+      s.x=ox+dx; s.y=oy+dy;
+      el.style.left=s.x+"px"; el.style.top=s.y+"px";
+      drawLinks();
+    }
+    function up(){
+      document.removeEventListener("mousemove",move);
+      document.removeEventListener("mouseup",up);
+      el.classList.remove("dragging");
+      save();
+    }
+    document.addEventListener("mousemove",move);
+    document.addEventListener("mouseup",up);
+  }
+
+  // ---- 画布平移 / 缩放 ----
+  stage.addEventListener("mousedown", e=>{
+    if(e.target!==stage && e.target!==world && e.target!==svg && !e.target.classList.contains("world")) return;
+    selId=null; syncSel();
+    const sx=e.clientX, sy=e.clientY, px=state.pan.x, py=state.pan.y;
+    stage.classList.add("panning");
+    function move(ev){ state.pan.x=px+(ev.clientX-sx); state.pan.y=py+(ev.clientY-sy); applyTransform(); }
+    function up(){ document.removeEventListener("mousemove",move); document.removeEventListener("mouseup",up); stage.classList.remove("panning"); save(); }
+    document.addEventListener("mousemove",move);
+    document.addEventListener("mouseup",up);
+  });
+  stage.addEventListener("wheel", e=>{
+    e.preventDefault();
+    const rect=stage.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const factor = e.deltaY<0 ? 1.1 : 1/1.1;
+    const nz = Math.min(2, Math.max(0.3, state.zoom*factor));
+    state.pan.x = mx - (mx-state.pan.x)*(nz/state.zoom);
+    state.pan.y = my - (my-state.pan.y)*(nz/state.zoom);
+    state.zoom = nz; applyTransform(); save();
+  }, {passive:false});
+
+  // ---- 操作 ----
+  function addStep(){
+    const n = state.steps.length;
+    const last = state.steps[n-1];
+    const x = last ? last.x + NODE_W + 70 : 40;
+    const y = last ? last.y : 40;
+    const s = {id:newId(), icon:"🧩", title:"新步骤", desc:"点击编辑说明", x, y};
+    state.steps.push(s);
+    render();
+    openPanel(s.id);
+    toast("已添加步骤");
+  }
+
+  function deleteStep(id){
+    const s = state.steps.find(x=>x.id===id);
+    if(!s) return;
+    if(!confirm(`确认删除步骤「${s.title}」？`)) return;
+    state.steps = state.steps.filter(x=>x.id!==id);
+    if(selId===id){ selId=null; closePanel(); }
+    render();
+    toast("已删除步骤");
+  }
+
+  function reorder(id, dir){
+    const i = state.steps.findIndex(x=>x.id===id);
+    const j = i+dir;
+    if(i<0 || j<0 || j>=state.steps.length) return;
+    const [it]=state.steps.splice(i,1);
+    state.steps.splice(j,0,it);
+    render();
+  }
+
+  function autoLayout(showToast=true){
+    const cols=4, gx=NODE_W+70, gy=150, mx=40, my=40;
+    state.steps.forEach((s,i)=>{
+      const c=i%cols, r=Math.floor(i/cols);
+      s.x = mx + c*gx;
+      s.y = my + r*gy;
+    });
+    render();
+    if(showToast) toast("已自动排版");
+  }
+
+  function fit(){
+    if(!state.steps.length) return;
+    let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+    state.steps.forEach(s=>{
+      const el=nodeEl(s.id); const w=el?el.offsetWidth:NODE_W, h=el?el.offsetHeight:90;
+      minX=Math.min(minX,s.x); minY=Math.min(minY,s.y);
+      maxX=Math.max(maxX,s.x+w); maxY=Math.max(maxY,s.y+h);
+    });
+    const pad=60;
+    const cw=stage.clientWidth, ch=stage.clientHeight;
+    const z=Math.min(2, Math.max(0.3, Math.min((cw-pad*2)/(maxX-minX),(ch-pad*2)/(maxY-minY))));
+    state.zoom=z;
+    state.pan.x = pad - minX*z + (cw-pad*2 - (maxX-minX)*z)/2;
+    state.pan.y = pad - minY*z + (ch-pad*2 - (maxY-minY)*z)/2;
+    applyTransform(); save();
+  }
+
+  // ---- 选择 / 面板 ----
+  function select(id){ selId=id; syncSel(); }
+  function syncSel(){
+    world.querySelectorAll(".node").forEach(n=>n.classList.toggle("sel", n.dataset.id===selId));
+  }
+
+  const panel=$("#panel"), fIcon=$("#fIcon"), fTitle=$("#fTitle"), fDesc=$("#fDesc");
+  function openPanel(id){
+    const s=state.steps.find(x=>x.id===id); if(!s) return;
+    selId=id; syncSel();
+    fIcon.value=s.icon||""; fTitle.value=s.title||""; fDesc.value=s.desc||"";
+    buildEmoji(s.icon);
+    panel.classList.add("open");
+  }
+  function closePanel(){ panel.classList.remove("open"); }
+  $("#panelClose").onclick=closePanel;
+
+  function buildEmoji(cur){
+    const row=$("#emojiRow"); row.innerHTML="";
+    EMOJIS.forEach(e=>{
+      const sp=document.createElement("span");
+      sp.textContent=e; if(e===cur) sp.classList.add("on");
+      sp.onclick=()=>{ fIcon.value=e; buildEmoji(e); updateFromPanel(); };
+      row.appendChild(sp);
+    });
+  }
+  function updateFromPanel(){
+    const s=state.steps.find(x=>x.id===selId); if(!s) return;
+    s.icon=fIcon.value.trim()||"⚙️"; s.title=fTitle.value.trim()||"未命名"; s.desc=fDesc.value;
+    // 更新对应节点 DOM
+    const el=nodeEl(s.id);
+    if(el){
+      el.querySelector(".ic").textContent=s.icon;
+      el.querySelector(".ttl").textContent=s.title;
+      el.querySelector(".desc").textContent=s.desc;
+    }
+    countEl.textContent=state.steps.length+" 个步骤";
+    drawLinks(); save();
+  }
+  fIcon.addEventListener("input",updateFromPanel);
+  fTitle.addEventListener("input",updateFromPanel);
+  fDesc.addEventListener("input",updateFromPanel);
+  $("#upBtn").onclick=()=>selId&&reorder(selId,-1);
+  $("#downBtn").onclick=()=>selId&&reorder(selId,1);
+  $("#delBtn").onclick=()=>selId&&deleteStep(selId);
+
+  // ---- 导入 / 导出 / 重置 ----
+  $("#addBtn").onclick=addStep;
+  $("#autoBtn").onclick=()=>autoLayout();
+  $("#fitBtn").onclick=fit;
+  $("#resetBtn").onclick=()=>{
+    if(confirm("重置为默认 9 环节工作流？当前画布内容将被覆盖。")){ seedDefault(); render(); toast("已重置为默认流程"); }
+  };
+  $("#exportBtn").onclick=()=>{
+    const data={version:1, exportedAt:new Date().toISOString(), steps:state.steps};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="workflow-canvas.json"; a.click();
+    URL.revokeObjectURL(a.href);
+    toast("已导出 JSON");
+  };
+  $("#importBtn").onclick=()=>$("#fileInput").click();
+  $("#fileInput").addEventListener("change", e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const d=JSON.parse(r.result);
+        if(!Array.isArray(d.steps)) throw new Error("缺少 steps 数组");
+        state.steps=d.steps.map(s=>({id:s.id||newId(), icon:s.icon||"⚙️", title:s.title||"未命名", desc:s.desc||"", x:s.x||0, y:s.y||0}));
+        uid=state.steps.length+1;
+        render(); toast("已导入 "+state.steps.length+" 个步骤");
+      }catch(err){ toast("导入失败："+err.message); }
+    };
+    r.readAsText(f); e.target.value="";
+  });
+
+  // ---- toast ----
+  let toastT;
+  function toast(msg){
+    const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1800);
+  }
+
+  // ---- 初始化 ----
+  if(!load()) seedDefault();
+  render();
+  // 初次适应屏幕
+  setTimeout(fit, 60);
+  window.addEventListener("resize", ()=>{ /* 不强制重排，仅保持 */ });
+})();
+</script>
+</body>
+</html>
