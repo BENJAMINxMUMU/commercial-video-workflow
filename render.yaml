@@ -11,15 +11,3 @@ services:
     pullRequestPreviews: false
     # 如需绑定自定义域名，在 Render 后台 Static Site → Settings → Custom Domains 添加，
     # 并按提示配置 DNS（CNAME 到 <name>.onrender.com）。
-
-  # 工作流变更通知服务（后端接收 + 实时变更流）
-  - type: web
-    name: commercial-video-workflow-notify
-    runtime: node
-    buildCommand: ""
-    startCommand: "node server.js"
-    plan: free
-    healthCheckPath: /
-    # 部署后获得固定域名：https://commercial-video-workflow-notify.onrender.com
-    # 通知接收：POST https://commercial-video-workflow-notify.onrender.com/api/notify
-    # 变更流看板：https://commercial-video-workflow-notify.onrender.com/notify
