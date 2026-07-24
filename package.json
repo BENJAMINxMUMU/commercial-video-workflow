@@ -1,0 +1,13 @@
+{
+  "name": "commercial-video-workflow-notify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "工作流变更通知接收与实时变更流服务",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
