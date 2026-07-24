@@ -114,6 +114,13 @@
     background:var(--ink); color:#fff; padding:9px 16px; border-radius:10px; font-size:13px;
     opacity:0; transition:.25s; z-index:50; pointer-events:none}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  /* 通知设置弹层 */
+  .pop{position:fixed; top:56px; right:16px; width:300px; background:#fff;
+    border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow);
+    padding:14px; z-index:40; display:none}
+  .pop.open{display:block}
+  .pop h4{margin:0 0 10px; font-size:14px}
+  .pop .field{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -128,7 +135,21 @@
     <button class="btn ghost" id="exportBtn">导出</button>
     <button class="btn ghost" id="importBtn">导入</button>
     <button class="btn danger" id="resetBtn">重置默认</button>
+    <button class="btn ghost" id="notifyBtn">🔔 通知</button>
     <input type="file" id="fileInput" accept="application/json">
+  </div>
+
+  <div class="pop" id="notifyPop">
+    <h4>变更通知设置</h4>
+    <div class="field">
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600">通知接收地址（…/api/notify）</label>
+      <input id="notifyUrl" placeholder="https://xxx.onrender.com/api/notify">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" id="notifySave" style="flex:1">保存</button>
+      <a class="btn primary" id="notifyView" target="_blank" style="flex:1;text-align:center;text-decoration:none">查看通知流</a>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">工作流改动会自动上报到此地址。</div>
   </div>
 
   <div class="stage" id="stage">
@@ -225,6 +246,26 @@
       uid = d.uid || (state.steps.length+1);
       return true;
     }catch(e){ return false; }
+  }
+
+  // ---- 通知上报 ----
+  const LS_NOTIFY = "cvw_notify_url";
+  const NOTIFY_DEF = "https://commercial-video-workflow-notify.onrender.com/api/notify";
+  function getNotifyUrl(){ return localStorage.getItem(LS_NOTIFY) || NOTIFY_DEF; }
+  function notify(type, title, detail){
+    const url = getNotifyUrl();
+    if(!url) return;
+    try{
+      fetch(url, {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({type, title, detail:detail||"", by:"画布用户", site:"commercial-video-workflow"})})
+        .then(r=>r.ok?null:console.warn("notify failed "+r.status))
+        .catch(()=>{});
+    }catch(e){}
+  }
+  let editTimer=null;
+  function notifyEdit(s){
+    clearTimeout(editTimer);
+    editTimer=setTimeout(()=>notify("edit","编辑步骤："+s.title, s.desc), 1500);
   }
 
   // ---- 渲染 ----
@@ -377,6 +418,7 @@
     state.steps.push(s);
     render();
     openPanel(s.id);
+    notify("add","新增步骤："+s.title, s.desc);
     toast("已添加步骤");
   }
 
@@ -384,6 +426,7 @@
     const s = state.steps.find(x=>x.id===id);
     if(!s) return;
     if(!confirm(`确认删除步骤「${s.title}」？`)) return;
+    notify("delete","删除步骤："+s.title);
     state.steps = state.steps.filter(x=>x.id!==id);
     if(selId===id){ selId=null; closePanel(); }
     render();
@@ -396,6 +439,7 @@
     if(i<0 || j<0 || j>=state.steps.length) return;
     const [it]=state.steps.splice(i,1);
     state.steps.splice(j,0,it);
+    notify("reorder","调整顺序："+it.title);
     render();
   }
 
@@ -407,7 +451,7 @@
       s.y = my + r*gy;
     });
     render();
-    if(showToast) toast("已自动排版");
+    if(showToast){ toast("已自动排版"); notify("layout","自动排版","共 "+state.steps.length+" 步"); }
   }
 
   function fit(){
@@ -464,6 +508,7 @@
       el.querySelector(".desc").textContent=s.desc;
     }
     countEl.textContent=state.steps.length+" 个步骤";
+    notifyEdit(s);
     drawLinks(); save();
   }
   fIcon.addEventListener("input",updateFromPanel);
@@ -478,7 +523,7 @@
   $("#autoBtn").onclick=()=>autoLayout();
   $("#fitBtn").onclick=fit;
   $("#resetBtn").onclick=()=>{
-    if(confirm("重置为默认 9 环节工作流？当前画布内容将被覆盖。")){ seedDefault(); render(); toast("已重置为默认流程"); }
+    if(confirm("重置为默认 9 环节工作流？当前画布内容将被覆盖。")){ seedDefault(); render(); notify("reset","重置为默认 9 环节"); toast("已重置为默认流程"); }
   };
   $("#exportBtn").onclick=()=>{
     const data={version:1, exportedAt:new Date().toISOString(), steps:state.steps};
@@ -503,6 +548,24 @@
       }catch(err){ toast("导入失败："+err.message); }
     };
     r.readAsText(f); e.target.value="";
+  });
+
+  // ---- 通知设置 ----
+  const notifyPop=$("#notifyPop"), notifyUrlInput=$("#notifyUrl");
+  $("#notifyBtn").onclick=()=>{
+    notifyUrlInput.value=getNotifyUrl();
+    const base=getNotifyUrl().replace(/\/api\/notify$/,"").replace(/\/$/,"");
+    $("#notifyView").href=base+"/notify";
+    notifyPop.classList.toggle("open");
+  };
+  $("#notifySave").onclick=()=>{
+    const v=notifyUrlInput.value.trim();
+    if(v) localStorage.setItem(LS_NOTIFY, v);
+    toast("通知地址已保存");
+    notifyPop.classList.remove("open");
+  };
+  document.addEventListener("click", e=>{
+    if(notifyPop.classList.contains("open") && !notifyPop.contains(e.target) && e.target.id!=="notifyBtn") notifyPop.classList.remove("open");
   });
 
   // ---- toast ----
