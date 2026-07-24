@@ -14,7 +14,7 @@
   .head{text-align:center; margin-bottom:28px}
   .head h1{font-size:26px; margin:0 0 8px}
   .head p{color:var(--muted); margin:0; font-size:14px}
-  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:18px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
   .card{background:var(--panel); border:1px solid #dde3ee; border-radius:16px; padding:22px;
     text-decoration:none; color:inherit; box-shadow:0 6px 20px rgba(31,39,51,.08); transition:.18s; display:block}
   .card:hover{transform:translateY(-3px); border-color:var(--accent); box-shadow:0 12px 28px rgba(31,39,51,.14)}
@@ -44,12 +44,6 @@
         <h2>工作流画布</h2>
         <p>可视化节点流程图，自由增删 / 拖拽 / 排序工作流步骤，支持导出导入 JSON。</p>
         <div class="go">打开画布 →</div>
-      </a>
-      <a class="card" href="https://commercial-video-workflow-notify.onrender.com/notify" target="_blank">
-        <div class="ic">🔔</div>
-        <h2>变更通知</h2>
-        <p>工作流每次增删 / 调整顺序 / 编辑都会实时上报，这里是变更流看板。</p>
-        <div class="go">打开通知流 →</div>
       </a>
     </div>
     <div class="foot">由 Render 静态站点托管 · 仓库 commercial-video-workflow</div>
